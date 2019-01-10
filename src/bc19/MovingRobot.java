@@ -22,6 +22,14 @@ public class MovingRobot extends AbstractRobot{
 		
 		return totalPath;
 	}
+
+	private double getHeuristicValue(Pair curr, Pair target){
+		return Math.sqrt(Math.pow(target.x - curr.x, 2) + Math.pow(target.y - curr.y, 2)
+	}
+
+	private Pair[] getNeighbors(Pair curr){
+		//uuhhhhhhhhhh
+	}
 	
 	
 	protected Deque<Pair> getPathTo(Pair target){
@@ -48,7 +56,7 @@ public class MovingRobot extends AbstractRobot{
 			}
 		}
 		gScore.put(passableMap[r.me.x][r.me.y], 0);
-		fScore.put(passableMap[r.me.x][r.me.y], Math.sqrt(Math.pow(target.x - r.me.x, 2) + Math.pow(target.y - r.me.y, 2)));
+		fScore.put(passableMap[r.me.x][r.me.y], getHeuristicValue(new Node(r.me.x, r.me.y), target);
 		
 		class PairComparator<Pair> implements Comparator<Pair>{
 			public int compare(Pair arg0, Pair arg1) {
