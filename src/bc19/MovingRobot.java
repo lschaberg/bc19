@@ -10,6 +10,15 @@ import java.util.PriorityQueue;
 
 public class MovingRobot extends AbstractRobot{
 	protected Deque<Pair> path;
+	int moveSpeed;
+
+	public MovingRobot(MyRobot r){
+		super(r);
+		moveSpeed = 4;
+		if(r.unit == SPECS.CRUSADER){
+			movespeed = 9;
+		}
+	}
 	
 	private Deque<Pair> reconstructPath(HashMap<Pair, Pair> cameFrom, Pair current){
 		Deque<Pair> totalPath = new LinkedList<Pair>();
@@ -27,8 +36,16 @@ public class MovingRobot extends AbstractRobot{
 		return Math.sqrt(Math.pow(target.x - curr.x, 2) + Math.pow(target.y - curr.y, 2)
 	}
 
-	private Pair[] getNeighbors(Pair curr){
-		//uuhhhhhhhhhh
+	private Pair[] getNeighbors(Pair curr, Pair[][] passableMap){
+
+
+		Pair[] neighbors = new Pair[(Math.sqrt(moveSpeed)-1)*12]
+
+		for(int i = -moveSpeed; i < moveSpeed; i++){
+			for(int j = -(moveSpeed - Math.abs(i)); j < moveSpeed - Math.abs(i); j++){
+
+			}
+		}
 	}
 	
 	
