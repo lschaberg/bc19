@@ -7,9 +7,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.PriorityQueue;
+import java.util.Queue;
 
 
-public class MovingRobot extends AbstractRobot{	
+public class MovingRobot extends AbstractRobot{		
 	protected Deque<Pair> path;
 	protected Pair target;
 	int moveSpeed;
@@ -24,12 +25,17 @@ public class MovingRobot extends AbstractRobot{
 	
 	private Deque<Pair> reconstructPath(HashMap<Pair, Pair> cameFrom, Pair current){
 		Deque<Pair> totalPath = new LinkedList<Pair>();
+		totalPath.add(current);
 		
 		while(cameFrom.containsKey(current)){
 			current = cameFrom.get(current);
-			totalPath.add(current);
+			totalPath.addFirst(current);
 		}
 		
+		totalPath.pollFirst();
+		for(Pair p : totalPath){
+			System.out.println(p.x + ", " + p.y);
+		}
 		return totalPath;
 	}
 
@@ -78,20 +84,27 @@ public class MovingRobot extends AbstractRobot{
 		gScore.put(passableMap[r.me.x][r.me.y], 0);
 		fScore.put(passableMap[r.me.x][r.me.y], getHeuristicValue(new Pair(r.me.x, r.me.y), target));		
 		
-		class PairComparator<Pair> implements Comparator<Pair>{
+		/*class PairComparator<Pair> implements Comparator<Pair>{
 			public int compare(Pair arg0, Pair arg1) {
 				//System.out.println("comparator output: " + fScore.get(arg0) + " compared to " + fScore.get(arg1) + " gets " + (int) Math.signum(fScore.get(arg0) - fScore.get(arg1)));
 				return (int) Math.signum(fScore.get(arg0) - fScore.get(arg1));
 			}
-		}
+		}*/
 				
 		HashSet<Pair> closedSet = new HashSet<Pair>(4096);  //potential overuse of memory
-		PriorityQueue<Pair> openSet = new PriorityQueue<Pair>(4096, new PairComparator<Pair>());
+		//PriorityQueue<Pair> openSet = new PriorityQueue<Pair>(4096, new PairComparator<Pair>());
+		ArrayList<Pair> openSet = new ArrayList<Pair>(4096);
 		openSet.add(passableMap[r.me.x][r.me.y]);
 		
 		Pair current;
 		while(!openSet.isEmpty()){
-			current = openSet.poll();
+			//current = openSet.poll();
+			current = openSet.get(0);
+			for(Pair p : openSet){
+				if(fScore.get(p) < fScore.get(current))
+					current = p;
+			}
+
 			if(current.equals(target)){
 				path = reconstructPath(cameFrom, current);
 				return path;
@@ -143,7 +156,7 @@ public class MovingRobot extends AbstractRobot{
 		return null;
 	}
 	
-	protected Pair search(Pair origin, boolean[][] map){ //Dijkstras that somehow combines passableMap and the map being searched to get the quickest movement there
+	protected Deque<Pair> search(boolean[][] map){ //Dijkstras that somehow combines passableMap and the map being searched to get the quickest movement there
 		Pair[][] passableMap = new Pair[r.getPassableMap()[0].length][r.getPassableMap().length];
 		for(int i = 0; i < passableMap.length; i++){
 			for(int j = 0; j < passableMap[i].length; j++){
@@ -155,40 +168,27 @@ public class MovingRobot extends AbstractRobot{
 		
 		
 		
-		passableMap[target.x][target.y] = target;
-		
 		HashMap<Pair, Pair> cameFrom = new HashMap<Pair, Pair>(4096);
 		
 		HashMap<Pair, Integer> gScore = new HashMap<Pair, Integer>(4096);
-		HashMap<Pair, Double> fScore = new HashMap<Pair, Double>(4096);
 		for(int i = 0; i < passableMap.length; i++){
 			for(int j = 0; j < passableMap[i].length; j++){
 				if(passableMap[i][j] != null){
 					gScore.put(passableMap[i][j], Integer.MAX_VALUE);
-					fScore.put(passableMap[i][j], Double.MAX_VALUE);
 				}
 			}
 		}
 		gScore.put(passableMap[r.me.x][r.me.y], 0);
-		fScore.put(passableMap[r.me.x][r.me.y], getHeuristicValue(new Pair(r.me.x, r.me.y), target));		
 		
-		class PairComparator<Pair> implements Comparator<Pair>{
-			public int compare(Pair arg0, Pair arg1) {
-				//System.out.println("comparator output: " + fScore.get(arg0) + " compared to " + fScore.get(arg1) + " gets " + (int) Math.signum(fScore.get(arg0) - fScore.get(arg1)));
-				return (int) Math.signum(fScore.get(arg0) - fScore.get(arg1));
-			}
-		}
-				
 		HashSet<Pair> closedSet = new HashSet<Pair>(4096);  //potential overuse of memory
-		PriorityQueue<Pair> openSet = new PriorityQueue<Pair>(4096, new PairComparator<Pair>());
+		Queue<Pair> openSet = new LinkedList<Pair>();
 		openSet.add(passableMap[r.me.x][r.me.y]);
 		
 		Pair current;
 		while(!openSet.isEmpty()){
 			current = openSet.poll();
-			if(current.equals(target)){
-				path = reconstructPath(cameFrom, current);
-				return null;
+			if(map[current.y][current.x]){
+				return reconstructPath(cameFrom, current);
 			}
 			
 			openSet.remove(current);
@@ -207,7 +207,6 @@ public class MovingRobot extends AbstractRobot{
 				
 				cameFrom.put(neighbor, current);
 				gScore.put(neighbor, tentativeGScore);
-				fScore.put(neighbor, tentativeGScore + getHeuristicValue(neighbor, target));
 				
 				if(!inOpen)
 					openSet.add(neighbor);

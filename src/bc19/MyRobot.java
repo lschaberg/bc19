@@ -4,7 +4,7 @@ public class MyRobot extends BCAbstractRobot {
 	private AbstractRobot self;
 	
 	public MyRobot(){
-		/*if(me.unit == SPECS.CASTLE){
+		if(me.unit == SPECS.CASTLE){
 			self = new Castle(this);
 		}
 		if(me.unit == SPECS.CHURCH){
@@ -21,7 +21,7 @@ public class MyRobot extends BCAbstractRobot {
 		}
 		if(me.unit == SPECS.PROPHET){
 			self = new Prophet(this);
-		}*/
+		}
 
 	}
 
