@@ -1,24 +1,31 @@
 package bc19;
 
 public class MyRobot extends BCAbstractRobot {
-	public int turn;
+	private AbstractRobot self;
+	
+	public MyRobot(){
+		/*if(me.unit == SPECS.CASTLE){
+			self = new Castle(this);
+		}
+		if(me.unit == SPECS.CHURCH){
+			self = new Church(this);
+		}
+		if(me.unit == SPECS.CRUSADER){
+			self = new Crusader(this);
+		}
+		if(me.unit == SPECS.PILGRIM){
+			self = new Pilgrim(this);
+		}
+		if(me.unit == SPECS.PREACHER){
+			self = new Preacher(this);
+		}
+		if(me.unit == SPECS.PROPHET){
+			self = new Prophet(this);
+		}*/
 
-    public Action turn() {
-    	turn++;
-    	
-    	if (me.unit == SPECS.CASTLE) {
-    		if (turn == 1) {
-    			log("Building a pilgrim.");
-    			return buildUnit(SPECS.PILGRIM,1,0);
-    		}
-    	}
+	}
 
-    	if (me.unit == SPECS.PILGRIM) {
-    		if (turn == 1) {
-    			log("I am a pilgrim.");
-                //log(Integer.toString([0][getVisibleRobots()[0].castle_talk]));
-    		}
-    	}
-    	return null;
+    public Action turn() {    	
+    	return self.turn;
 	}
 }

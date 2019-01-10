@@ -2,6 +2,7 @@ package bc19;
 
 public abstract class AbstractRobot {
 	MyRobot r;
+	int turnCount;
 
 	public Action turn;
 	
