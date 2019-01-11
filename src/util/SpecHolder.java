@@ -1,4 +1,4 @@
-package bc19;
+package util;
 
 public class SpecHolder {
 	public int COMMUNICATION_BITS;

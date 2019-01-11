@@ -1,4 +1,4 @@
-package bc19;
+package util;
 
 public class UnitSpec {
     public int CONSTRUCTION_KARBONITE;
