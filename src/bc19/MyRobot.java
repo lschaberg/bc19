@@ -7,41 +7,40 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Queue;
 
-import util.Action;
-import util.BCAbstractRobot;
+//import util.Action;
+//import util.BCAbstractRobot;
 
 public class MyRobot extends BCAbstractRobot {
 	private AbstractRobot self;
+	private int myrTurnCount;
 	
-	public MyRobot(){
-		/*if(me.unit == SPECS.CASTLE){
-			self = new Castle(this);
-		}
-		if(me.unit == SPECS.CHURCH){
-			self = new Church(this);
-		}
-		if(me.unit == SPECS.CRUSADER){
-			self = new Crusader(this);
-		}
-		if(me.unit == SPECS.PILGRIM){
-			self = new Pilgrim(this);
-		}
-		if(me.unit == SPECS.PREACHER){
-			self = new Preacher(this);
-		}
-		if(me.unit == SPECS.PROPHET){
-			self = new Prophet(this);
-		}*/
-	}
-
-    public Action turn() {    	
-    	//return self.robotTurn();
-    	return null;
+    public Action turn() {   
+    	if(myrTurnCount == 0){
+			if(me.unit == SPECS.CASTLE){
+				self = new Castle(this);
+			}
+			if(me.unit == SPECS.CHURCH){
+				self = new Church(this);
+			}
+			if(me.unit == SPECS.CRUSADER){
+				self = new Crusader(this);
+			}
+			if(me.unit == SPECS.PILGRIM){
+				self = new Pilgrim(this);
+			}
+			if(me.unit == SPECS.PREACHER){
+				self = new Preacher(this);
+			}
+			if(me.unit == SPECS.PROPHET){
+				self = new Prophet(this);
+			}
+    	}
+    	myrTurnCount++;
+    	return self.robotTurn();
 	}
     
     public class AbstractRobot {
     	MyRobot r;
-    	int turnCount;
 
     	public AbstractRobot(){}
     	
@@ -58,25 +57,32 @@ public class MyRobot extends BCAbstractRobot {
     			this.y = y;
     		}
     	}
+    	
+    	public boolean inMap(int x, int y){
+    		return x >= 0 && y >= 0 && x < r.getPassableMap()[0].length && y < r.getPassableMap().length;
+    	}
     }
 
     public class Castle extends AbstractRobot{
+    	int turnCount = 0;
     	
     	public Castle(MyRobot r){
     		this.r = r;
     	}
     	
     	public Action robotTurn(){
-    		if(turnCount % 10 == 0){
+    		r.log("Turn #" + turnCount);
+    		if(turnCount++ % 10 == 0){
     			for(int i = -1; i <= 1; i++){
     				for(int j = -1; j <= 1; j++){
-    					if(r.getVisibleRobotMap()[r.me.y + i][r.me.x + j] <= 0 && r.getPassableMap()[r.me.y + i][r.me.x + j] == true){
-    						return r.buildUnit(1, j, i);
+    					r.log("Checking for available Pilgrim locations");
+    					if(inMap(r.me.x + j, r.me.y + i) && r.getVisibleRobotMap()[r.me.y + i][r.me.x + j] <= 0 && r.getPassableMap()[r.me.y + i][r.me.x + j] == true){
+    						r.log("Attempting to build Pilgrim");
+    						return r.buildUnit(2, j, i);
     					}
     				}
     			}
     		}
-    		turnCount++;
     		return null;
     	}
     }
@@ -157,7 +163,7 @@ public class MyRobot extends BCAbstractRobot {
     				}
     			}
     		}
-    		
+    		passableMap[r.me.x][r.me.y] = new Pair(r.me.x, r.me.y);
     		
     		
     		passableMap[target.x][target.y] = target;
@@ -230,9 +236,15 @@ public class MyRobot extends BCAbstractRobot {
     	}
     	
     	public Action followPath(){
-    		if(r.me.x == target.x && r.me.y == target.y)
+    		if(path.isEmpty())
     			return null;
     		Pair nextStep = path.poll();
+    		r.log("Move distance:" + ((nextStep.x - r.me.x)*(nextStep.x - r.me.x) + (nextStep.y - r.me.y)*(nextStep.y - r.me.y)));
+    		r.log("Fuel: " + r.fuel);
+    		if((nextStep.x - r.me.x)*(nextStep.x - r.me.x) + (nextStep.y - r.me.y)*(nextStep.y - r.me.y) > r.fuel){
+    			path.addFirst(nextStep);
+    			return null;
+    		}
     		if(r.getVisibleRobotMap()[nextStep.y][nextStep.x] > 0){
     			if(r.getVisibleRobotMap()[target.x][target.y] > 0){
     				return targetBlocked();
@@ -242,7 +254,7 @@ public class MyRobot extends BCAbstractRobot {
     				followPath();
     			}
     		}
-    		return r.move(target.x - r.me.x, target.y - r.me.y);
+    		return r.move(nextStep.x - r.me.x, nextStep.y - r.me.y);
     	}
     	
     	public Action targetBlocked(){
@@ -258,7 +270,7 @@ public class MyRobot extends BCAbstractRobot {
     				}
     			}
     		}
-    		
+    		passableMap[r.me.x][r.me.y] = new Pair(r.me.x, r.me.y);
     		
     		
     		HashMap<Pair, Pair> cameFrom = new HashMap<Pair, Pair>(4096);
@@ -313,43 +325,49 @@ public class MyRobot extends BCAbstractRobot {
     private class Pilgrim extends MovingRobot{
     	public Pilgrim(MyRobot r){
     		super(r);
-    		if(r.me.id % 2 == 0)
-    			fuel = true;
-    		boolean[][] tempMap = r.getFuelMap();
-    		availableFuel = new boolean[tempMap.length][];
-    		for(int i = 0; i < availableFuel.length; i++){
-    			availableFuel[i] = tempMap[i].clone();
-    		}
-    		availableKarbonite = new boolean[tempMap.length][];
-    		for(int i = 0; i < availableKarbonite.length; i++){
-    			availableKarbonite[i] = tempMap[i].clone();
-    		}
-    		if(fuel){
-    			availableFuel[target.y][target.x] = false;
-    			path = search(availableFuel);
-    			target = path.peekLast();
-    		}
-    		else{
-    			availableKarbonite[target.y][target.x] = false;
-    			path = search(availableKarbonite);
-    			target = path.peekLast();
-    		}
-    		state = TRAVELING;
-    		
     	}
     	
+    	int turnCount = 0;
+
     	private static final int TRAVELING = 0;
     	private static final int FARMING = 1;
     	private static final int DEPOSITING = 2;
     	private Integer state;
     	
     	private Pair resourcePatch; //durable record of where this pilgrim is farming, only set when it has been reached and claimed
-    	private boolean fuel;
+    	private boolean fuel = false;
     	
     	private boolean[][] availableFuel;
     	private boolean[][] availableKarbonite;
     	
     	public Action robotTurn(){
+    		if(turnCount == 0){
+	    		if(r.me.id % 2 == 0)
+	    			fuel = true;
+	    		boolean[][] tempMap = r.getFuelMap();
+	    		availableFuel = new boolean[tempMap.length][];
+	    		for(int i = 0; i < availableFuel.length; i++){
+	    			availableFuel[i] = tempMap[i].clone();
+	    		}
+	    		tempMap = r.getKarboniteMap();
+	    		availableKarbonite = new boolean[tempMap.length][];
+	    		for(int i = 0; i < availableKarbonite.length; i++){
+	    			availableKarbonite[i] = tempMap[i].clone();
+	    		}
+	    		if(fuel){
+	    			path = search(availableFuel);
+	    			target = path.pollLast();
+	    			path.add(target);
+	    		}
+	    		else{
+	    			path = search(availableKarbonite);
+	    			target = path.pollLast();
+	    			path.add(target);
+	    		}
+	    		state = TRAVELING;
+    		}
+    		
+    		turnCount++;
     		switch(state){
     		case TRAVELING: return traveling();
     		case FARMING: return farming();
@@ -361,7 +379,7 @@ public class MyRobot extends BCAbstractRobot {
     	
     	public Action traveling(){
     		//if target reached set resourcePatch to target and state to farming type resource
-    		if(r.me.x == target.x && r.me.y == target.y){
+    		if(path.isEmpty()){
     			resourcePatch = target;
     			state = FARMING;
     			return farming();
@@ -374,27 +392,27 @@ public class MyRobot extends BCAbstractRobot {
     		if(r.me.fuel > 95 || r.me.karbonite >= 20){
     			boolean hasNearbyBuilding = false;
     			boolean[][] nearbyBuildings = new boolean[availableFuel.length][availableFuel[0].length];
-    			int[][] visibleRobotsMap = r.getVisibleRobotMap();
-    			for(int i = 0; i < availableFuel.length; i++){
-    				for(int j = 0; j < availableFuel[0].length; j++){
-    					if(visibleRobotsMap[i][j] > 0 && r.getRobot(visibleRobotsMap[i][j]).unit <= 1 && r.getRobot(visibleRobotsMap[i][j]).team == r.me.team){
-    						nearbyBuildings[i+1][j] = r.getPassableMap()[i+1][j] && visibleRobotsMap[i+1][j] <= 0;
-    						nearbyBuildings[i+1][j-1] = r.getPassableMap()[i+1][j-1] && visibleRobotsMap[i+1][j-1] <= 0;
-    						nearbyBuildings[i+1][j+1] = r.getPassableMap()[i+1][j+1] && visibleRobotsMap[i+1][j+1] <= 0;
-    						nearbyBuildings[i][j+1] = r.getPassableMap()[i+1][j+1] && visibleRobotsMap[i][j+1] <= 0;
-    						nearbyBuildings[i][j-1] = r.getPassableMap()[i+1][j-1] && visibleRobotsMap[i][j-1] <= 0;
-    						nearbyBuildings[i-1][j-1] = r.getPassableMap()[i-1][j-1] && visibleRobotsMap[i-1][j-1] <= 0;
-    						nearbyBuildings[i-1][j] = r.getPassableMap()[i-1][j] && visibleRobotsMap[i-1][j] <= 0;
-    						nearbyBuildings[i-1][j+1] = r.getPassableMap()[i-1][j+1] && visibleRobotsMap[i-1][j+1] <= 0;
-    						hasNearbyBuilding = hasNearbyBuilding || nearbyBuildings[i+1][j] || nearbyBuildings[i+1][j-1] || nearbyBuildings[i+1][j+1] || nearbyBuildings[i][j+1] || nearbyBuildings[i][j-1] || nearbyBuildings[i-1][j-1] || nearbyBuildings[i-1][j] || nearbyBuildings[i-1][j+1];
-    					}
-    				}
+    			Robot[] visibleRobots = r.getVisibleRobots();
+    			for(int i = 0; i < visibleRobots.length; i++){
+					if(visibleRobots[i].unit <= 1 && visibleRobots[i].team == r.me.team){
+						for(int j = -1; j <= 1; j++){
+							for(int k = -1; k <= 1; k++){
+								if(inMap(visibleRobots[i].x + j, visibleRobots[i].y + k) && r.getPassableMap()[visibleRobots[i].y + k][visibleRobots[i].x + j] && (r.getVisibleRobotMap()[visibleRobots[i].y + k][visibleRobots[i].x + j] <= 0 || r.getVisibleRobotMap()[visibleRobots[i].y + k][visibleRobots[i].x + j] == r.me.id)){
+									nearbyBuildings[visibleRobots[i].y + k][visibleRobots[i].x + j] = true;
+									hasNearbyBuilding = true;
+								}
+							}
+						}
+					}
     			}
     			if(hasNearbyBuilding){
     				path = search(nearbyBuildings);
-    				target = path.peekLast();
+        			target = path.pollLast();
+        			path.add(target);
+        			state = DEPOSITING;
     				return depositing();
     			}
+    			r.log("No nearby buildings, attempting to build church");
     			for(int i = -1; i <= 1; i++){
     				for(int j = -1; j <= 1; j++){
     					if(r.getVisibleRobotMap()[r.me.y + i][r.me.x + j] <= 0 && r.getPassableMap()[r.me.y + i][r.me.x + j] == true && r.getKarboniteMap()[r.me.y + i][r.me.x + j] == false && r.getFuelMap()[r.me.y + i][r.me.x + j] == false){
@@ -416,13 +434,15 @@ public class MyRobot extends BCAbstractRobot {
     	
     	public Action depositing(){
     		//if adjacent to target then deposit and change target to resourcePatch and change state to traveling
-    		if(r.me.x == target.x && r.me.y == target.y){
+    		if(path.isEmpty()){
+    			r.log("Pilgrim next to castle");
     			for(int i = -1; i <= 1; i++){
     				for(int j = -1; j <= 1; j++){
-    					if(r.getVisibleRobotMap()[r.me.y + i][r.me.x + j] > 0 && r.getRobot(r.getVisibleRobotMap()[i][j]).unit <= 1 && r.getRobot(r.getVisibleRobotMap()[i][j]).team == r.me.team){
+    					if(r.getVisibleRobotMap()[r.me.y + i][r.me.x + j] > 0 && r.getRobot(r.getVisibleRobotMap()[r.me.y + i][r.me.x + j]).unit <= 1 && r.getRobot(r.getVisibleRobotMap()[r.me.y + i][r.me.x + j]).team == r.me.team){
     						path = getPathTo(resourcePatch);
     						target = resourcePatch;
     						state = TRAVELING;
+    						r.log("Giving: " + r.me.karbonite + " karbonite and " + r.me.fuel + " fuel to (" + j + ", " + i + ")");
     						return r.give(j, i, r.me.karbonite, r.me.fuel);
     					}
     				}
@@ -437,12 +457,14 @@ public class MyRobot extends BCAbstractRobot {
     			if(fuel){
     				availableFuel[target.y][target.x] = false;
     				path = search(availableFuel);
-    				target = path.peekLast();
+        			target = path.pollLast();
+        			path.add(target);
     			}
     			else{
     				availableKarbonite[target.y][target.x] = false;
     				path = search(availableKarbonite);
-    				target = path.peekLast();
+        			target = path.pollLast();
+        			path.add(target);
     			}
     			return followPath();
     		}
