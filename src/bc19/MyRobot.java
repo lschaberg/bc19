@@ -61,7 +61,24 @@ public class MyRobot extends BCAbstractRobot {
     	public boolean inMap(int x, int y){
     		return x >= 0 && y >= 0 && x < r.getPassableMap()[0].length && y < r.getPassableMap().length;
     	}
-    }
+    	
+    	public boolean isAffordable(int u){
+    		int karbCost = 10;
+    		int fuelCost = 50;
+    		if(u == 1){
+    			karbCost = 50;
+    			fuelCost = 200;
+    		}
+    		else if(u == 3)
+    			karbCost = 20;
+    		else if(u == 4)
+    			karbCost = 25;
+    		else if(u == 5)
+    			karbCost = 30;
+    		
+    		return karbCost <= r.karbonite && fuelCost <= r.fuel;
+    	}
+      }
 
     public class Castle extends AbstractRobot{
     	int turnCount = 0;
@@ -75,8 +92,7 @@ public class MyRobot extends BCAbstractRobot {
     		if(turnCount++ % 10 == 0){
     			for(int i = -1; i <= 1; i++){
     				for(int j = -1; j <= 1; j++){
-    					r.log("Checking for available Pilgrim locations");
-    					if(inMap(r.me.x + j, r.me.y + i) && r.getVisibleRobotMap()[r.me.y + i][r.me.x + j] <= 0 && r.getPassableMap()[r.me.y + i][r.me.x + j] == true){
+    					if(inMap(r.me.x + j, r.me.y + i) && r.getVisibleRobotMap()[r.me.y + i][r.me.x + j] <= 0 && r.getPassableMap()[r.me.y + i][r.me.x + j] == true && isAffordable(2)){
     						r.log("Attempting to build Pilgrim");
     						return r.buildUnit(2, j, i);
     					}
@@ -133,7 +149,7 @@ public class MyRobot extends BCAbstractRobot {
     		
     		totalPath.pollFirst();
     		for(Pair p : totalPath){
-    			System.out.println(p.x + ", " + p.y);
+    			//r.log(p.x + ", " + p.y);
     		}
     		return totalPath;
     	}
@@ -239,20 +255,18 @@ public class MyRobot extends BCAbstractRobot {
     		if(path.isEmpty())
     			return null;
     		Pair nextStep = path.poll();
-    		r.log("Move distance:" + ((nextStep.x - r.me.x)*(nextStep.x - r.me.x) + (nextStep.y - r.me.y)*(nextStep.y - r.me.y)));
-    		r.log("Fuel: " + r.fuel);
-    		if((nextStep.x - r.me.x)*(nextStep.x - r.me.x) + (nextStep.y - r.me.y)*(nextStep.y - r.me.y) > r.fuel){
+    		//r.log("Move distance:" + ((nextStep.x - r.me.x)*(nextStep.x - r.me.x) + (nextStep.y - r.me.y)*(nextStep.y - r.me.y)));
+    		//r.log("Fuel: " + r.fuel);
+    		if(((nextStep.x - r.me.x)*(nextStep.x - r.me.x) + (nextStep.y - r.me.y)*(nextStep.y - r.me.y)) *  Math.max(1, r.me.unit - 2) > r.fuel){
     			path.addFirst(nextStep);
     			return null;
     		}
+			if(r.getVisibleRobotMap()[target.y][target.x] > 0){
+				return targetBlocked();
+			}
     		if(r.getVisibleRobotMap()[nextStep.y][nextStep.x] > 0){
-    			if(r.getVisibleRobotMap()[target.x][target.y] > 0){
-    				return targetBlocked();
-    			}
-    			else{
-    				getPathTo(target);
-    				followPath();
-    			}
+				getPathTo(target);
+				return followPath();
     		}
     		return r.move(nextStep.x - r.me.x, nextStep.y - r.me.y);
     	}
@@ -335,15 +349,12 @@ public class MyRobot extends BCAbstractRobot {
     	private Integer state;
     	
     	private Pair resourcePatch; //durable record of where this pilgrim is farming, only set when it has been reached and claimed
-    	private boolean fuel = false;
     	
     	private boolean[][] availableFuel;
     	private boolean[][] availableKarbonite;
     	
     	public Action robotTurn(){
     		if(turnCount == 0){
-	    		if(r.me.id % 2 == 0)
-	    			fuel = true;
 	    		boolean[][] tempMap = r.getFuelMap();
 	    		availableFuel = new boolean[tempMap.length][];
 	    		for(int i = 0; i < availableFuel.length; i++){
@@ -354,16 +365,18 @@ public class MyRobot extends BCAbstractRobot {
 	    		for(int i = 0; i < availableKarbonite.length; i++){
 	    			availableKarbonite[i] = tempMap[i].clone();
 	    		}
-	    		if(fuel){
-	    			path = search(availableFuel);
+    			path = search(availableFuel);
+    			Deque<Pair> tempPath = search(availableKarbonite);
+    			if(path.size() > tempPath.size())
+    				path = tempPath;
+    			if(!path.isEmpty()){
 	    			target = path.pollLast();
 	    			path.add(target);
-	    		}
-	    		else{
-	    			path = search(availableKarbonite);
-	    			target = path.pollLast();
-	    			path.add(target);
-	    		}
+    			}
+    			else{
+    				target = new Pair(r.me.x, r.me.y);
+    			}
+    			
 	    		state = TRAVELING;
     		}
     		
@@ -384,6 +397,12 @@ public class MyRobot extends BCAbstractRobot {
     			state = FARMING;
     			return farming();
     		}
+			for(Robot bot : r.getVisibleRobots()){
+				if(bot.id == r.me.id)
+					continue;
+				availableFuel[bot.y][bot.x] = false;
+				availableKarbonite[bot.y][bot.x] = false;
+			}
     		return followPath();
     	}
     	
@@ -407,8 +426,10 @@ public class MyRobot extends BCAbstractRobot {
     			}
     			if(hasNearbyBuilding){
     				path = search(nearbyBuildings);
-        			target = path.pollLast();
-        			path.add(target);
+    				if(!path.isEmpty()){
+	        			target = path.pollLast();
+	        			path.add(target);
+    				}
         			state = DEPOSITING;
     				return depositing();
     			}
@@ -435,7 +456,6 @@ public class MyRobot extends BCAbstractRobot {
     	public Action depositing(){
     		//if adjacent to target then deposit and change target to resourcePatch and change state to traveling
     		if(path.isEmpty()){
-    			r.log("Pilgrim next to castle");
     			for(int i = -1; i <= 1; i++){
     				for(int j = -1; j <= 1; j++){
     					if(r.getVisibleRobotMap()[r.me.y + i][r.me.x + j] > 0 && r.getRobot(r.getVisibleRobotMap()[r.me.y + i][r.me.x + j]).unit <= 1 && r.getRobot(r.getVisibleRobotMap()[r.me.y + i][r.me.x + j]).team == r.me.team){
@@ -454,18 +474,14 @@ public class MyRobot extends BCAbstractRobot {
     	
     	public Action targetBlocked(){
     		if(state == TRAVELING){
-    			if(fuel){
-    				availableFuel[target.y][target.x] = false;
-    				path = search(availableFuel);
-        			target = path.pollLast();
-        			path.add(target);
-    			}
-    			else{
-    				availableKarbonite[target.y][target.x] = false;
-    				path = search(availableKarbonite);
-        			target = path.pollLast();
-        			path.add(target);
-    			}
+    			path = search(availableFuel);
+    			Deque<Pair> tempPath = search(availableKarbonite);
+    			if(path == null || (tempPath != null && path.size() > tempPath.size()))
+    				if(path == null && tempPath == null)
+    					return null; //party time
+    				path = tempPath;
+    			target = path.pollLast();
+    			path.add(target);
     			return followPath();
     		}
     		if(state == DEPOSITING){
