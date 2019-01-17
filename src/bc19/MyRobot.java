@@ -113,7 +113,7 @@ public class MyRobot extends BCAbstractRobot {
     	}
     	
     	public Action robotTurn(){
-    		//r.log("Turn #" + turnCount);
+    		r.log("Turn #" + turnCount);
     		if(turnCount == 0){
     			for(int i = 0; i < r.getPassableMap().length/2; i++){
     				for(int j = 0; j < r.getPassableMap()[0].length/2; j++){
@@ -128,8 +128,8 @@ public class MyRobot extends BCAbstractRobot {
     			else{
     				topOrLeft = r.getKarboniteMap().length - r.me.y * 2 > 0;
     			}
-    			for(int i = -10; i <= 10; i++){
-    				for(int j = -10; j <= 10; j++){
+    			for(int i = -8; i <= 8; i++){
+    				for(int j = -8; j <= 8; j++){
     					if(inMap(r.me.x + i, r.me.y + j) && (r.karboniteMap[r.me.y + j][r.me.x + i] || r.fuelMap[r.me.y + j][r.me.x + i]) && i*i + j*j <= 100){
     						nearbyResources++;
     					}
@@ -223,10 +223,14 @@ public class MyRobot extends BCAbstractRobot {
     				if(bot.team == r.me.team && r.isRadioing(bot) && bot.unit == 0){
     					verticallySymmetric = (bot.signal >> 15) == 1;
     					topOrLeft = (bot.signal >> 14) % 2 == 1;
-    					int castle2long = ((int) ((bot.signal >> 10) % 8)) * 4;
-	        			int castle2short = ((int) ((bot.signal >> 7) % 4)) * 4;
-    					int castle3long = ((int) ((bot.signal >> 4) % 8)) * 4;
-	        			int castle3short = ((int) (bot.signal % 4)) * 4;
+    					int castle2long = ((int) ((bot.signal >> 10) % 16)) * 4;
+	        			int castle2short = ((int) ((bot.signal >> 7) % 8)) * 4;
+    					int castle3long = ((int) ((bot.signal >> 3) % 16)) * 4;
+	        			int castle3short = ((int) (bot.signal % 8)) * 4;
+	        			//r.log("Castle 2 long: " + castle2long);
+	        			//r.log("Castle 2 short: " + castle2short);
+	        			//r.log("Castle 3 long: " + castle3long);
+	        			//r.log("Castle 3 short: " + castle3short);
     					if(verticallySymmetric){
     						if(topOrLeft){
     							if(castle2short != 0 || castle2long != 0){
@@ -298,6 +302,12 @@ public class MyRobot extends BCAbstractRobot {
     				}
     			}
     			if(verticallySymmetric){
+    				enemyCastles.add(new Pair(enemyCastlesMap[0].length - 1 - r.me.x, r.me.y));
+    			}
+    			else{
+    				enemyCastles.add(new Pair(r.me.x, enemyCastlesMap.length - 1 - r.me.y));
+    			}
+    			/*if(verticallySymmetric){
     				for(int i = -1; i < 1; i++){
     					for(int j = -1; j < 1; j++){
     						if(inMap(enemyCastlesMap[0].length - 1 - r.me.x, r.me.y))
@@ -312,24 +322,30 @@ public class MyRobot extends BCAbstractRobot {
     							enemyCastlesMap[enemyCastlesMap.length - 1 - r.me.y][r.me.x] = true;
     					}
     				}
-    			}
-				path = search(enemyCastlesMap);
+    			}*/
+				path = getPathTo(enemyCastles.get(0));
+				//r.log("Initial path: " + path);
     			target = path.pollLast();
     			path.add(target);
     		}
-    		else if(path.isEmpty()){
-				path = search(enemyCastlesMap);
-    			target = path.pollLast();
-    			path.add(target);
-    		}
-    		turnCount++;
+    		
 			for(int i = -4; i <= 4; i++){
 				for(int j = -4; j <= 4; j++){
-					if(inMap(r.me.x + i, r.me.y + j) && i*i + j*j <= 100){
-						enemyCastlesMap[r.me.y + j][r.me.x + i] = r.getVisibleRobotMap()[r.me.y + j][r.me.x + i] > 0 && r.getRobot(r.getVisibleRobotMap()[r.me.y + j][r.me.x + i]).unit == 0 && r.getRobot(r.getVisibleRobotMap()[r.me.y + j][r.me.x + i]).team != r.me.team;
+					if(inMap(r.me.x + i, r.me.y + j) && i*i + j*j <= 16){
+						enemyCastlesMap[r.me.y + j][r.me.x + i] = r.getVisibleRobotMap()[r.me.y + j][r.me.x + i] != 0 && r.getRobot(r.getVisibleRobotMap()[r.me.y + j][r.me.x + i]).unit == 0 && r.getRobot(r.getVisibleRobotMap()[r.me.y + j][r.me.x + i]).team != r.me.team;
 					}
 				}
 			}
+			
+    		if(path.isEmpty()){
+				path = search(enemyCastlesMap);
+				//r.log("Path is empty, new path: " + path);
+    			target = path.pollLast();
+    			path.add(target);
+    		}
+    		
+    		turnCount++;
+    		
     		Robot lowestEnemy = null;
     		for(Robot bot : r.getVisibleRobots()){
     			if(bot.team != r.me.team && (lowestEnemy == null || bot.health < lowestEnemy.health))
@@ -371,12 +387,12 @@ public class MyRobot extends BCAbstractRobot {
     		}
     	}
     	
-    	private Deque<Pair> reconstructPath(HashMap<Pair, Pair> cameFrom, Pair current){
+    	private Deque<Pair> reconstructPath(Pair[][] cameFrom, Pair current){
     		Deque<Pair> totalPath = new LinkedList<Pair>();
     		totalPath.add(current);
     		
-    		while(cameFrom.containsKey(current)){
-    			current = cameFrom.get(current);
+    		while(cameFrom[current.x][current.y] != null){
+    			current = cameFrom[current.x][current.y];
     			totalPath.addFirst(current);
     		}
     		
@@ -384,8 +400,29 @@ public class MyRobot extends BCAbstractRobot {
     		return totalPath;
     	}
 
+    	private short ourRoot(short num){
+    	    short res = 0;
+    	    short bit = 1 << 14; // The second-to-top bit is set: 1 << 30 for 32 bits
+    	 
+    	    // "bit" starts at the highest power of four <= the argument.
+    	    while (bit > num)
+    	        bit >>= 2;
+    	        
+    	    while (bit != 0) {
+    	        if (num >= res + bit) {
+    	            num -= res + bit;
+    	            res += bit << 1;
+    	        }
+    	        
+    	        res >>= 1;
+    	        bit >>= 2;
+    	    }
+    	    return res;
+    	}
+    	
     	private double getHeuristicValue(Pair curr, Pair target){
-    		return Math.sqrt(Math.pow(target.x - curr.x, 2) + Math.pow(target.y - curr.y, 2));
+    		//return Math.abs(Math.abs(curr.x - target.x) - Math.abs(curr.y - target.y))/2 + Math.min(Math.abs(curr.x - target.x), Math.abs(curr.y - target.y));
+    		return Math.sqrt((Math.pow(target.x - curr.x, 2) + Math.pow(target.y - curr.y, 2)));
     	}
 
     	private ArrayList<Pair> getPassableNeighbors(Pair curr, Pair[][] passableMap){
@@ -401,6 +438,8 @@ public class MyRobot extends BCAbstractRobot {
     	
     	
     	protected Deque<Pair> getPathTo(Pair target){
+    		r.log("Entering A*");
+    		int nodesChecked = 0;
     		Pair[][] passableMap = new Pair[r.getPassableMap()[0].length][r.getPassableMap().length];
     		for(int i = 0; i < passableMap.length; i++){
     			for(int j = 0; j < passableMap[i].length; j++){
@@ -414,67 +453,68 @@ public class MyRobot extends BCAbstractRobot {
     		
     		passableMap[target.x][target.y] = target;
     		
-    		HashMap<Pair, Pair> cameFrom = new HashMap<Pair, Pair>(4096);
-    		
-    		HashMap<Pair, Integer> gScore = new HashMap<Pair, Integer>(4096);
-    		HashMap<Pair, Double> fScore = new HashMap<Pair, Double>(4096);
+    		Pair[][] cameFrom = new Pair[r.getPassableMap()[0].length][r.getPassableMap().length];
+    		int[][] gScore = new int[r.getPassableMap()[0].length][r.getPassableMap().length];
+    		double[][] fScore = new double[r.getPassableMap()[0].length][r.getPassableMap().length];
+
     		for(int i = 0; i < passableMap.length; i++){
     			for(int j = 0; j < passableMap[i].length; j++){
     				if(passableMap[i][j] != null){
-    					gScore.put(passableMap[i][j], Integer.MAX_VALUE);
-    					fScore.put(passableMap[i][j], Double.MAX_VALUE);
+    					gScore[i][j] = Integer.MAX_VALUE;
+    					fScore[i][j] = Double.MAX_VALUE;
     				}
     			}
     		}
-    		gScore.put(passableMap[r.me.x][r.me.y], 0);
-    		fScore.put(passableMap[r.me.x][r.me.y], getHeuristicValue(new Pair(r.me.x, r.me.y), target));		
-    		
-    		/*class PairComparator<Pair> implements Comparator<Pair>{
-    			public int compare(Pair arg0, Pair arg1) {
-    				//System.out.println("comparator output: " + fScore.get(arg0) + " compared to " + fScore.get(arg1) + " gets " + (int) Math.signum(fScore.get(arg0) - fScore.get(arg1)));
-    				return (int) Math.signum(fScore.get(arg0) - fScore.get(arg1));
-    			}
-    		}*/
-    				
-    		HashSet<Pair> closedSet = new HashSet<Pair>(4096);  //potential overuse of memory
-    		//PriorityQueue<Pair> openSet = new PriorityQueue<Pair>(4096, new PairComparator<Pair>());
-    		ArrayList<Pair> openSet = new ArrayList<Pair>(4096);
+    		gScore[r.me.x][r.me.y] = 0;
+    		fScore[r.me.x][r.me.y] = getHeuristicValue(new Pair(r.me.x, r.me.y), target);		
+     				
+    		boolean[][] closedSet = new boolean[r.getPassableMap()[0].length][r.getPassableMap().length];
+    		ArrayList<Pair> openSet = new ArrayList<Pair>(r.getPassableMap().length * r.getPassableMap()[0].length);
     		openSet.add(passableMap[r.me.x][r.me.y]);
+    		boolean[][] openMap = new boolean[r.getPassableMap()[0].length][r.getPassableMap().length];
+    		openMap[r.me.x][r.me.y] = true;
     		
     		Pair current;
     		while(!openSet.isEmpty()){
-    			//current = openSet.poll();
-    			current = openSet.get(0);
+    			current = null;
+    			nodesChecked++;
+    			if(nodesChecked % 10 == 0)
+    				r.log("Nodes checked: " + nodesChecked);
     			for(Pair p : openSet){
-    				if(fScore.get(p) < fScore.get(current))
+    				if(current == null)
+    					current = p;
+    				if(fScore[p.x][p.y] < fScore[current.x][current.y])
     					current = p;
     			}
 
     			if(current.equals(target)){
+        			r.log("Nodes checked: " + nodesChecked);
     				path = reconstructPath(cameFrom, current);
     				return path;
     			}
     			
     			openSet.remove(current);
-    			closedSet.add(current);
+    			openMap[current.x][current.y] = false;
+    			closedSet[current.x][current.y] = true;
     			
     			for(Pair neighbor : getPassableNeighbors(current, passableMap)){
-    				//System.out.println("checking neighbor: " + neighbor.x + ", " + neighbor.y);
-    				if(closedSet.contains(neighbor))
+    				if(closedSet[neighbor.x][neighbor.y])
     					continue;
     				
-    				int tentativeGScore = gScore.get(current) + 1;
+    				int tentativeGScore = gScore[current.x][current.y] + 1;
     				
-    				boolean inOpen = openSet.contains(neighbor);
-    				if(inOpen && tentativeGScore >= gScore.get(neighbor))
+    				boolean inOpen = openMap[neighbor.x][neighbor.y];
+    				if(inOpen && tentativeGScore >= gScore[neighbor.x][neighbor.y])
     					continue;
     				
-    				cameFrom.put(neighbor, current);
-    				gScore.put(neighbor, tentativeGScore);
-    				fScore.put(neighbor, tentativeGScore + getHeuristicValue(neighbor, target));
+    				cameFrom[neighbor.x][neighbor.y] = current;
+    				gScore[neighbor.x][neighbor.y] = tentativeGScore;
+    				fScore[neighbor.x][neighbor.y] = tentativeGScore + getHeuristicValue(neighbor, target);
     				
-    				if(!inOpen)
+    				if(!inOpen){
     					openSet.add(neighbor);
+    					openMap[neighbor.x][neighbor.y] = true;
+    				}
     			}
     		}
     		
@@ -504,6 +544,8 @@ public class MyRobot extends BCAbstractRobot {
     	}
     	
     	protected Deque<Pair> search(boolean[][] map){ //Dijkstras that somehow combines passableMap and the map being searched to get the quickest movement there
+    		r.log("Entering BFS");
+    		int nodesChecked = 0;
     		Pair[][] passableMap = new Pair[r.getPassableMap()[0].length][r.getPassableMap().length];
     		for(int i = 0; i < passableMap.length; i++){
     			for(int j = 0; j < passableMap[i].length; j++){
@@ -514,49 +556,55 @@ public class MyRobot extends BCAbstractRobot {
     		}
     		passableMap[r.me.x][r.me.y] = new Pair(r.me.x, r.me.y);
     		
-    		
-    		HashMap<Pair, Pair> cameFrom = new HashMap<Pair, Pair>(4096);
-    		
-    		HashMap<Pair, Integer> gScore = new HashMap<Pair, Integer>(4096);
+       		Pair[][] cameFrom = new Pair[r.getPassableMap()[0].length][r.getPassableMap().length];
+    		int[][] gScore = new int[r.getPassableMap()[0].length][r.getPassableMap().length];
+
     		for(int i = 0; i < passableMap.length; i++){
     			for(int j = 0; j < passableMap[i].length; j++){
     				if(passableMap[i][j] != null){
-    					gScore.put(passableMap[i][j], Integer.MAX_VALUE);
+    					gScore[i][j] = Integer.MAX_VALUE;
     				}
     			}
     		}
-    		gScore.put(passableMap[r.me.x][r.me.y], 0);
+    		gScore[r.me.x][r.me.y] = 0;
     		
-    		HashSet<Pair> closedSet = new HashSet<Pair>(4096);  //potential overuse of memory
+    		boolean[][] closedSet = new boolean[r.getPassableMap()[0].length][r.getPassableMap().length];
     		Queue<Pair> openSet = new LinkedList<Pair>();
     		openSet.add(passableMap[r.me.x][r.me.y]);
+    		boolean[][] openMap = new boolean[r.getPassableMap()[0].length][r.getPassableMap().length];
+    		openMap[r.me.x][r.me.y] = true;
     		
     		Pair current;
     		while(!openSet.isEmpty()){
+    			nodesChecked++;
+    			if(nodesChecked % 25 == 0)
+    				r.log("BFS Nodes checked: " + nodesChecked);
     			current = openSet.poll();
+    			openMap[current.x][current.y] = false;
     			if(map[current.y][current.x]){
+    				r.log("BFS Nodes checked: " + nodesChecked);
     				return reconstructPath(cameFrom, current);
     			}
     			
-    			openSet.remove(current);
-    			closedSet.add(current);
+    			closedSet[current.x][current.y] = true;
     			
     			for(Pair neighbor : getPassableNeighbors(current, passableMap)){
-    				//System.out.println("checking neighbor: " + neighbor.x + ", " + neighbor.y);
-    				if(closedSet.contains(neighbor))
+    				if(closedSet[neighbor.x][neighbor.y])
     					continue;
     				
-    				int tentativeGScore = gScore.get(current) + 1;
+    				int tentativeGScore = gScore[current.x][current.y] + 1;
     				
-    				boolean inOpen = openSet.contains(neighbor);
-    				if(inOpen && tentativeGScore >= gScore.get(neighbor))
+    				boolean inOpen = openMap[neighbor.x][neighbor.y];
+    				if(inOpen && tentativeGScore >= gScore[neighbor.x][neighbor.y])
     					continue;
     				
-    				cameFrom.put(neighbor, current);
-    				gScore.put(neighbor, tentativeGScore);
+    				cameFrom[neighbor.x][neighbor.y] = current;
+    				gScore[neighbor.x][neighbor.y] = tentativeGScore;
     				
-    				if(!inOpen)
+    				if(!inOpen){
     					openSet.add(neighbor);
+    					openMap[neighbor.x][neighbor.y] = true;
+    				}
     			}
     		}
     		
@@ -578,25 +626,22 @@ public class MyRobot extends BCAbstractRobot {
     	
     	private Pair resourcePatch; //durable record of where this pilgrim is farming, only set when it has been reached and claimed
     	
-    	private boolean[][] availableFuel;
-    	private boolean[][] availableKarbonite;
+    	private boolean[][] availableResources;
     	
     	public Action robotTurn(){
     		if(turnCount == 0){
 	    		boolean[][] tempMap = r.getFuelMap();
-	    		availableFuel = new boolean[tempMap.length][];
-	    		for(int i = 0; i < availableFuel.length; i++){
-	    			availableFuel[i] = tempMap[i].clone();
+	    		availableResources = new boolean[tempMap.length][];
+	    		for(int i = 0; i < availableResources.length; i++){
+	    			availableResources[i] = tempMap[i].clone();
 	    		}
 	    		tempMap = r.getKarboniteMap();
-	    		availableKarbonite = new boolean[tempMap.length][];
-	    		for(int i = 0; i < availableKarbonite.length; i++){
-	    			availableKarbonite[i] = tempMap[i].clone();
+	    		for(int i = 0; i < availableResources.length; i++){
+	    			for(int j = 0; j < availableResources[0].length; j++){
+	    				availableResources[i][j] |= tempMap[i][j];
+	    			}
 	    		}
-    			path = search(availableFuel);
-    			Deque<Pair> tempPath = search(availableKarbonite);
-    			if(path.size() > tempPath.size())
-    				path = tempPath;
+    			path = search(availableResources);
     			if(!path.isEmpty()){
 	    			target = path.pollLast();
 	    			path.add(target);
@@ -622,7 +667,7 @@ public class MyRobot extends BCAbstractRobot {
     		//if target reached set resourcePatch to target and state to farming type resource
     		if(path.isEmpty()){
     			boolean hasNearbyBuilding = false;
-    			boolean[][] nearbyBuildings = new boolean[availableFuel.length][availableFuel[0].length];
+    			boolean[][] nearbyBuildings = new boolean[availableResources.length][availableResources[0].length];
     			Robot[] visibleRobots = r.getVisibleRobots();
     			for(int i = 0; i < visibleRobots.length; i++){
 					if(visibleRobots[i].unit <= 1 && visibleRobots[i].team == r.me.team){
@@ -639,14 +684,14 @@ public class MyRobot extends BCAbstractRobot {
     			if(!hasNearbyBuilding){
 	    			for(int i = -1; i <= 1; i++){
 	    				for(int j = -1; j <= 1; j++){
-	    					if(isAffordable(1) && r.getVisibleRobotMap()[r.me.y + i][r.me.x + j] <= 0 && r.getPassableMap()[r.me.y + i][r.me.x + j] == true && r.getKarboniteMap()[r.me.y + i][r.me.x + j] == false && r.getFuelMap()[r.me.y + i][r.me.x + j] == false){
+	    					if(inMap(r.me.x + j, r.me.y + i) && isAffordable(1) && r.getVisibleRobotMap()[r.me.y + i][r.me.x + j] <= 0 && r.getPassableMap()[r.me.y + i][r.me.x + j] == true && r.getKarboniteMap()[r.me.y + i][r.me.x + j] == false && r.getFuelMap()[r.me.y + i][r.me.x + j] == false){
 	    						return r.buildUnit(1, j, i);
 	    					}
 	    				}
 	    			}
 	    			for(int i = -1; i <= 1; i++){
 	    				for(int j = -1; j <= 1; j++){
-	    					if(isAffordable(1) && r.getVisibleRobotMap()[r.me.y + i][r.me.x + j] <= 0 && r.getPassableMap()[r.me.y + i][r.me.x + j] == true){
+	    					if(inMap(r.me.x + j, r.me.y + i) && isAffordable(1) && r.getVisibleRobotMap()[r.me.y + i][r.me.x + j] <= 0 && r.getPassableMap()[r.me.y + i][r.me.x + j] == true){
 	    						return r.buildUnit(1, j, i);
 	    					}
 	    				}
@@ -668,8 +713,7 @@ public class MyRobot extends BCAbstractRobot {
 			for(Robot bot : r.getVisibleRobots()){
 				if(bot.id == r.me.id)
 					continue;
-				availableFuel[bot.y][bot.x] = false;
-				availableKarbonite[bot.y][bot.x] = false;
+				availableResources[bot.y][bot.x] = false;
 			}
     		return followPath();
     	}
@@ -703,15 +747,20 @@ public class MyRobot extends BCAbstractRobot {
     	}
     	
     	public Action targetBlocked(){
+    		//r.log("Pilgrim's target is blocked");
     		if(state == TRAVELING){
-    			path = search(availableFuel);
-    			Deque<Pair> tempPath = search(availableKarbonite);
-    			if(path == null || (tempPath != null && path.size() > tempPath.size()))
-    				if(path == null && tempPath == null)
-    					return null; //party time
-    				path = tempPath;
-    			target = path.pollLast();
-    			path.add(target);
+    			path = search(availableResources);
+    			if(path == null){
+    				//r.log("Seen everything");
+    				return null;
+    			}
+    			if(!path.isEmpty()){
+	    			target = path.pollLast();
+	    			path.add(target);
+    			}
+    			else{
+    				target = new Pair(r.me.x, r.me.y);
+    			}
     			return followPath();
     		}
     		if(state == DEPOSITING){
