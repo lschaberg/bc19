@@ -7,8 +7,6 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Queue;
 
-import util.Robot;
-
 //import util.Action;
 //import util.BCAbstractRobot;
 
@@ -76,7 +74,7 @@ public class MyRobot extends BCAbstractRobot {
     			fuelCost = 200;
     		}
     		else if(u == 3)
-    			karbCost = 20;
+    			karbCost = 15;
     		else if(u == 4)
     			karbCost = 25;
     		else if(u == 5)
@@ -98,6 +96,27 @@ public class MyRobot extends BCAbstractRobot {
     	public int getDistance(Robot bot){
     		return (r.me.x - bot.x)*(r.me.x - bot.x) + (r.me.y - bot.y)*(r.me.x - bot.y);
     	}
+    	
+    	public int attackRange(Robot bot){
+    		if(bot.unit == 0)
+    			return 100;
+    		if(bot.unit == 3)
+    			return 16;
+    		if(bot.unit == 4)
+    			return 64;
+    		if(bot.unit == 5)
+    			return 16;
+    	}
+    	
+    	public Action tryMove(Pair... moves){
+    		for(Pair move : moves){
+    			if(inMap(r.me.x + move.x, r.me.y + move.y) && r.getPassableMap()[r.me.y + move.y][r.me.x + move.x] && r.getVisibleRobotMap()[r.me.y + move.y][r.me.x + move.x] <= 0){
+    				return r.move(move.x, move.y);
+    			}
+    		}
+    		return null;
+    	}
+    	
     }
 
     public class Castle extends AbstractRobot{
@@ -105,11 +124,13 @@ public class MyRobot extends BCAbstractRobot {
     	ArrayList<Robot> otherCastles = new ArrayList<Robot>(2);
     	ArrayList<Integer> compressedCastles = new ArrayList<Integer>(2);
     	int nearbyResources = 0;
+    	int nearbyKarbonite = 0;
     	boolean verticallySymmetric = false;
     	boolean topOrLeft = false;
 		int magicCompressedNumber = 0;
 		boolean closestCastle = true;
-		int karboniteReserve = 100;
+		int karboniteReserve = 30;
+		int phase = 1;
     	
     	public Castle(MyRobot r){
     		this.r = r;
@@ -135,6 +156,9 @@ public class MyRobot extends BCAbstractRobot {
     				for(int j = -8; j <= 8; j++){
     					if(inMap(r.me.x + i, r.me.y + j) && (r.karboniteMap[r.me.y + j][r.me.x + i] || r.fuelMap[r.me.y + j][r.me.x + i]) && i*i + j*j <= 100){
     						nearbyResources++;
+    						if(r.karboniteMap[r.me.y + j][r.me.x + i]){
+    							nearbyKarbonite++;
+    						}
     					}
     				}
     			}
@@ -162,6 +186,12 @@ public class MyRobot extends BCAbstractRobot {
 				}
 				r.castleTalk(128 + magicCompressedNumber);
 				turnCount++;
+    			for(Robot bot : r.getVisibleRobots()){
+    				if(bot.team == r.me.team && bot.id != r.me.id && bot.castle_talk != 0){
+    					otherCastles.add(bot);
+    					compressedCastles.add(bot.castle_talk - 128);
+    				}
+    			}
 				return tryBuild(2);
     		}
     		if(turnCount == 1){
@@ -195,9 +225,9 @@ public class MyRobot extends BCAbstractRobot {
     				}
     			}
 
-    			if(closestCastle){
+    			/*if(closestCastle){
     				return tryBuild(4); //tell it to scout by pathing to opposite enemy castle and following half the path, then retreating on contact
-    			}
+    			}*/
     		}
     		turnCount++;
     		int enemyCrusaders = 0;
@@ -208,12 +238,11 @@ public class MyRobot extends BCAbstractRobot {
     		int ourMages = 0;
     		int ourPilgrims = 0;
     		boolean othersNeedRangers = false;
-    		Robot lowestEnemy = null;
+    		Robot closestEnemy = null;
     		for(Robot bot : r.getVisibleRobots()){
-    			if(bot.team != me.team){
-    				if(getDistance(bot) <= 64 && (lowestEnemy == null || bot.health < lowestEnemy.health)){
-    					lowestEnemy = bot;
-    				}
+    			if(bot.team != r.me.team){
+        			if(closestEnemy == null || getDistance(bot) < getDistance(closestEnemy))
+        				closestEnemy = bot;
     				if(bot.unit == 3){
     					enemyCrusaders++;
     				}
@@ -229,25 +258,30 @@ public class MyRobot extends BCAbstractRobot {
     					ourPilgrims++;
     				}
     				if(bot.unit == 3){
-    					enemyCrusaders++;
+    					ourCrusaders++;
     				}
     				else if(bot.unit == 4){
-    					enemyRangers++;
+    					ourRangers++;
     				}
     				else if(bot.unit == 5){
-    					enemyMages++;
+    					ourMages++;
     				}
     			}
     			else{
     				for(Robot c : otherCastles){
     					if(c.id == bot.id){
-    						othersNeedRangers = c.castle_talk < 6 && c.castle_talk < ourRangers;
+    						r.log("castle talk: " + bot.castle_talk);
+    						othersNeedRangers |= bot.castle_talk < 7 && bot.castle_talk < ourRangers;
     					}
     				}
     			}
     		}
-    		if(isAffordable(4) && enemyMages * 2 > ourRangers){ //change to preachers if rangers have problems
-    			return tryBuild(4);
+    		r.log("our rangers: " + ourRangers);
+    		r.castleTalk(ourRangers);
+    		
+    		if(isAffordable(5) && enemyMages  > ourMages){ //change to preachers if rangers have problems
+    			r.log("Building a mage because they have " + enemyMages + " and we have " + ourMages);
+    			return tryBuild(5);
     		}
     		if(isAffordable(5) && enemyCrusaders > ourMages){
     			return tryBuild(5);
@@ -255,13 +289,18 @@ public class MyRobot extends BCAbstractRobot {
     		if(isAffordable(4) && enemyRangers > ourRangers){
     			return tryBuild(4);
     		}
-    		if(ourPilgrims < nearbyResources && r.karbonite >= karboniteReserve + 10 && isAffordable(2)){
+    		/*if(ourPilgrims < nearbyKarbonite && phase == 1 && r.karbonite >= karboniteReserve + 10 && isAffordable(2))
+    			return tryBuild(2);*/
+    		if(ourPilgrims < nearbyResources && phase != 1 && r.karbonite >= karboniteReserve + 10 && isAffordable(2)){
     			return tryBuild(2);
     		}
-    		if(lowestEnemy != null){
-    			return r.attack(lowestEnemy.x - r.me.x, lowestEnemy.y - r.me.y);
+    		if(closestEnemy != null){
+    			return r.attack(closestEnemy.x - r.me.x, closestEnemy.y - r.me.y);
     		}
-			if(isAffordable(4) && !othersNeedRangers && (ourRangers < 6 || closestCastle) && r.karbonite >= karboniteReserve + 25){
+			if(isAffordable(4) && !othersNeedRangers && (ourRangers < 7 || closestCastle) && r.karbonite >= karboniteReserve + 25){
+				r.log("karbonite: " + r.karbonite);
+				r.log("karbonite reserve: " + karboniteReserve);
+				r.log("others need rangers: " + othersNeedRangers);
 				int magicCompressedNumber2 = (otherCastles.size() + 1) << 14;
 				if(otherCastles.size() > 0){
     				magicCompressedNumber2 += compressedCastles.get(0) << 7;
@@ -548,6 +587,7 @@ public class MyRobot extends BCAbstractRobot {
     	}
     	
     	int turnCount = 0;
+    	boolean panicMode = false;
 
     	private static final int TRAVELING = 0;
     	private static final int FARMING = 1;
@@ -596,6 +636,58 @@ public class MyRobot extends BCAbstractRobot {
     		}
     		
     		turnCount++;
+    		
+    		Robot closestEnemy = null;
+    		for(Robot bot : r.getVisibleRobots()){
+    			if(bot.team != r.me.team && (closestEnemy == null || getDistance(bot) < getDistance(closestEnemy)))
+    				closestEnemy = bot;
+    		}
+    		Action move = null;
+    		if(closestEnemy != null && getDistance(closestEnemy) <= 100){
+    			if(closestEnemy.x > r.me.x){
+    				if(closestEnemy.y > r.me.y){
+    					move = tryMove(new Pair(-1, -1), new Pair(-2, 0), new Pair(0, -2), new Pair(-1, 0), new Pair(0, -1));
+    				}
+    				else if(r.me.y > closestEnemy.y){
+    					move = tryMove(new Pair(-1, 1), new Pair(-2, 0), new Pair(0, 2), new Pair(-1, 0), new Pair(0, 1));
+    				}
+    				else{
+    					move = tryMove(new Pair(-2, 0), new Pair(-1, 1), new Pair(-1, -1), new Pair(-1, 0));
+    				}
+    			}
+    			else if(r.me.x > closestEnemy.x){
+    				if(closestEnemy.y > r.me.y){
+    					move = tryMove(new Pair(1, -1), new Pair(2, 0), new Pair(0, -2), new Pair(1, 0), new Pair(0, -1));
+    				}
+    				else if(r.me.y > closestEnemy.y){
+    					move = tryMove(new Pair(1, 1), new Pair(2, 0), new Pair(0, 2), new Pair(1, 0), new Pair(0, 1));
+    				}
+    				else{
+    					move = tryMove(new Pair(2, 0), new Pair(1, 1), new Pair(1, -1), new Pair(-1, 0));
+    				}
+    			}
+    			else{
+    				if(closestEnemy.y > r.me.y){
+    					move = tryMove(new Pair(0, -2), new Pair(1, -1), new Pair(-1, -1), new Pair(0, -1));
+    				}
+    				else if(r.me.y > closestEnemy.y){
+    					move = tryMove(new Pair(0, 2), new Pair(1, 1), new Pair(-1, 1), new Pair(0, 1));
+    				}
+    			}
+    		}
+    		if(move != null){
+    			panicMode = true;
+    			return move;
+    		}
+
+    		if(panicMode){
+    			panicMode = false;
+    			if(state == FARMING){
+    				state = TRAVELING;
+    				target = resourcePatch;
+    			}
+    			path = getPathTo(target);
+    		}
     		switch(state){
     		case TRAVELING: return traveling();
     		case FARMING: return farming();
@@ -724,8 +816,7 @@ public class MyRobot extends BCAbstractRobot {
     	boolean castle3;
     	ArrayList<Pair> enemyCastles = new ArrayList<Pair>(3);
     	boolean[][] enemyCastlesMap;
-    	
-    	
+    	    	
     	public Action robotTurn(){
     		if(turnCount == 0){
     			for(int i = 0; i < r.getPassableMap().length/2; i++){
@@ -833,7 +924,22 @@ public class MyRobot extends BCAbstractRobot {
     			else{
     				enemyCastles.add(new Pair(r.me.x, enemyCastlesMap.length - 1 - r.me.y));
     			}
-
+    			/*if(verticallySymmetric){
+    				for(int i = -1; i < 1; i++){
+    					for(int j = -1; j < 1; j++){
+    						if(inMap(enemyCastlesMap[0].length - 1 - r.me.x, r.me.y))
+    							enemyCastlesMap[r.me.y][enemyCastlesMap[0].length - 1 - r.me.x] = true;
+    					}
+    				}
+    			}
+    			else{
+    				for(int i = -1; i < 1; i++){
+    					for(int j = -1; j < 1; j++){
+    						if(inMap(r.me.x, enemyCastlesMap.length - 1 - r.me.y))
+    							enemyCastlesMap[enemyCastlesMap.length - 1 - r.me.y][r.me.x] = true;
+    					}
+    				}
+    			}*/
 				path = getPathTo(enemyCastles.get(0));
 				//r.log("Initial path: " + path);
     			target = path.pollLast();
@@ -862,17 +968,14 @@ public class MyRobot extends BCAbstractRobot {
     		
     		turnCount++;
     		
-    		Robot lowestEnemy = null;
+    		Robot closestEnemy = null;
     		for(Robot bot : r.getVisibleRobots()){
-    			if(bot.team != r.me.team && (lowestEnemy == null || bot.health < lowestEnemy.health))
-    				lowestEnemy = bot;
+    			if(bot.team != r.me.team && (closestEnemy == null || getDistance(bot) < getDistance(closestEnemy)))
+    				closestEnemy = bot;
     		}
-    		if(lowestEnemy != null)
-    			return r.attack(lowestEnemy.x - r.me.x, lowestEnemy.y - r.me.y);
+    		if(closestEnemy != null)
+    			return r.attack(closestEnemy.x - r.me.x, closestEnemy.y - r.me.y);
     		return followPath();
-    		//attack if possible
-    		//else SMOrc
-    		//needs castles to solve symmetry and broadcast it in order to find enemy castles
     	}
     	
     	public Action targetBlocked(){
@@ -898,11 +1001,22 @@ public class MyRobot extends BCAbstractRobot {
     	int stepsTaken = 0;
 		boolean scout = true;
 		boolean closestCastle = true;
+		boolean[][] lineMap;
+		Robot myCastle;
+		int phase = 1;
+		int castle1short = 0;
+		int castle1long = 0;
+		int castle2short = 0;
+		int castle2long = 0;
+		int castle3short = 0;
+		int castle3long = 0;
+    	boolean panicMode = false;
 
     	
     	
     	public Action robotTurn(){
     		if(turnCount == 0){
+    			lineMap = new boolean[r.getFuelMap()[0].length][r.getFuelMap().length];
     			for(int i = 0; i < r.getPassableMap().length/2; i++){
     				for(int j = 0; j < r.getPassableMap()[0].length/2; j++){
     					if(r.getPassableMap()[i][j] != r.getPassableMap()[r.getPassableMap().length -1 - i][j]){
@@ -917,16 +1031,20 @@ public class MyRobot extends BCAbstractRobot {
     				topOrLeft = r.getKarboniteMap().length - r.me.y * 2 > 0;
     			}
     			
-    			enemyCastlesMap = new boolean[r.getFuelMap().length][r.getFuelMap()[0].length];
+    			enemyCastlesMap = new boolean[r.getFuelMap()[0].length][r.getFuelMap().length];
     			for(Robot bot : r.getVisibleRobots()){
+    				if(bot.team == r.me.team && bot.unit == 0){
+    					myCastle = bot;
+    				}
+
     				if(bot.team == r.me.team && r.isRadioing(bot) && bot.unit == 0){
     					r.log("received castle count :" + (bot.signal >> 14));
     					castle2 = (bot.signal >> 14) > 1;
     					castle3 = (bot.signal >> 14) > 2;
-    					int castle2long = ((int) ((bot.signal >> 10) % 16)) * 4;
-	        			int castle2short = ((int) ((bot.signal >> 7) % 8)) * 4;
-    					int castle3long = ((int) ((bot.signal >> 3) % 16)) * 4;
-	        			int castle3short = ((int) (bot.signal % 8)) * 4;
+    					castle2long = ((int) ((bot.signal >> 10) % 16)) * 4;
+	        			castle2short = ((int) ((bot.signal >> 7) % 8)) * 4;
+    					castle3long = ((int) ((bot.signal >> 3) % 16)) * 4;
+	        			castle3short = ((int) (bot.signal % 8)) * 4;
 	        			r.log("Castle 2 long: " + castle2long);
 	        			r.log("Castle 2 short: " + castle2short);
 	        			r.log("Castle 3 long: " + castle3long);
@@ -1009,8 +1127,6 @@ public class MyRobot extends BCAbstractRobot {
     				enemyCastles.add(new Pair(r.me.x, enemyCastlesMap.length - 1 - r.me.y));
     			}
 
-    			int castle1short = 0;
-    			int castle1long = 0;
 	    		for(Robot bot : r.getVisibleRobots()){
 	    			if(bot.unit == 4 && bot.team == r.me.team && bot.id != r.me.id){
 	    				scout = false;
@@ -1039,7 +1155,7 @@ public class MyRobot extends BCAbstractRobot {
 	        				closestCastle = false;
 	        			}
 	        			if(closestCastle && castle1short == castle2short){
-	        				if(verticallySymmetrical){
+	        				if(verticallySymmetric){
 	        					closestCastle = Math.abs(castle1long - enemyCastlesMap.length) > Math.abs(castle2long - enemyCastlesMap.length);
 	        				}
 	        				else{
@@ -1047,7 +1163,7 @@ public class MyRobot extends BCAbstractRobot {
 	        				}
 	        			}
 	        			if(closestCastle && castle1short == castle3short){
-	        				if(verticallySymmetrical){
+	        				if(verticallySymmetric){
 	        					closestCastle = Math.abs(castle1long - enemyCastlesMap.length) > Math.abs(castle3long - enemyCastlesMap.length);
 	        				}
 	        				else{
@@ -1057,16 +1173,36 @@ public class MyRobot extends BCAbstractRobot {
 	    			}
 	    		}
 	    		
-	    		if(!closestCastle){
-	    			
-	    		}
+	    		/*for(int i = -3; i <= 3; i++)
+	    			if(verticallySymmetric){
+	    				if(topOrLeft){
+	    					lineMap[myCastle.y + i][myCastle.x + 2] = true;
+	    				}
+	    				else{
+	    					lineMap[myCastle.y + i][myCastle.x - 2] = true;
+	    				}
+	    			}
+	    			else{
+	    				if(topOrLeft){
+	    					lineMap[myCastle.y + 2][myCastle.x + i] = true;
+	    				}
+	    				else{
+	    					lineMap[myCastle.y - 2][myCastle.x + i] = true;
+	    				}
+	    			}
+    			}*/
+	    		
+	    		path = getPathTo(enemyCastles.get(0));
+	    		target = path.pollLast();
+	    		path.add(target);
 
-	    		if(scout){
+	    		
+	    		/*if(scout){
 	    			path = getPathTo(enemyCastles.get(0));
 					//r.log("Initial path: " + path);
 	    			target = path.pollLast();
 	    			path.add(target);
-	    		}
+	    		}*/
     		}
     		
 			/*for(int i = -4; i <= 4; i++){
@@ -1091,25 +1227,86 @@ public class MyRobot extends BCAbstractRobot {
     		
     		turnCount++;
     		
-    		if(scout){
+    		/*if(scout){
     			//if enemies in range, radio info and path back to castle
     			if(stepsTaken < path.size()/2){
     				stepsTaken++;
     				followPath();
     			}
-    		}
+    		}*/
     		
-    		Robot lowestEnemy = null;
+    		Robot closestEnemy = null;
     		for(Robot bot : r.getVisibleRobots()){
-    			if(bot.team != r.me.team && (lowestEnemy == null || bot.health < lowestEnemy.health))
-    				lowestEnemy = bot;
+    			if(bot.team != r.me.team && (closestEnemy == null || getDistance(bot) < getDistance(closestEnemy)))
+    				closestEnemy = bot;
     		}
-    		if(lowestEnemy != null)
-    			return r.attack(lowestEnemy.x - r.me.x, lowestEnemy.y - r.me.y);
+    		Action move = null;
+    		if(closestEnemy != null && getDistance(closestEnemy) <= 16){
+    			if(closestEnemy.x > r.me.x){
+    				if(closestEnemy.y > r.me.y){
+    					move = tryMove(new Pair(-1, -1), new Pair(-2, 0), new Pair(0, -2), new Pair(-1, 0), new Pair(0, -1));
+    				}
+    				else if(r.me.y > closestEnemy.y){
+    					move = tryMove(new Pair(-1, 1), new Pair(-2, 0), new Pair(0, 2), new Pair(-1, 0), new Pair(0, 1));
+    				}
+    				else{
+    					move = tryMove(new Pair(-2, 0), new Pair(-1, 1), new Pair(-1, -1), new Pair(-1, 0));
+    				}
+    			}
+    			else if(r.me.x > closestEnemy.x){
+    				if(closestEnemy.y > r.me.y){
+    					move = tryMove(new Pair(1, -1), new Pair(2, 0), new Pair(0, -2), new Pair(1, 0), new Pair(0, -1));
+    				}
+    				else if(r.me.y > closestEnemy.y){
+    					move = tryMove(new Pair(1, 1), new Pair(2, 0), new Pair(0, 2), new Pair(1, 0), new Pair(0, 1));
+    				}
+    				else{
+    					move = tryMove(new Pair(2, 0), new Pair(1, 1), new Pair(1, -1), new Pair(-1, 0));
+    				}
+    			}
+    			else{
+    				if(closestEnemy.y > r.me.y){
+    					move = tryMove(new Pair(0, -2), new Pair(1, -1), new Pair(-1, -1), new Pair(0, -1));
+    				}
+    				else if(r.me.y > closestEnemy.y){
+    					move = tryMove(new Pair(0, 2), new Pair(1, 1), new Pair(-1, 1), new Pair(0, 1));
+    				}
+    			}
+    		}
+    		if(move != null){
+    			panicMode = true;
+    			return move;
+    		}
+    		if(closestEnemy != null)
+    			return r.attack(closestEnemy.x - r.me.x, closestEnemy.y - r.me.y);
     		
+    		if(phase == 1){
+    			int shortDist = 0;
+    			if(verticallySymmetric){
+    				if(topOrLeft){
+    					shortDist = r.me.x - myCastle.x;
+    				}
+    				else{
+    					shortDist = myCastle.x - r.me.x;
+    				}
+    			}
+    			else{
+    				if(topOrLeft){
+    					shortDist = r.me.y - myCastle.y;
+    				}
+    				else{
+    					shortDist = myCastle.y - r.me.y;
+    				}
+    			}
+    			if(shortDist < 2){
+    				if(panicMode){
+    					path = getPathTo(target);
+    				}
+    				return followPath();
+    			}
+    		}
     		
-    		
-    		return followPath();
+    		return null;
     		//attack if possible
     		//else SMOrc
     		//needs castles to solve symmetry and broadcast it in order to find enemy castles

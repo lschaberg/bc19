@@ -162,8 +162,8 @@ public class MyRobot extends BCAbstractRobot {
 				r.castleTalk(128 + magicCompressedNumber);
 				//signal pilgrim to go for karbonite only
 				turnCount++;
-				pilgrimsBuilt++;
-				return tryBuild(2);
+				//pilgrimsBuilt++;
+				return tryBuild(5);
     		}
     		if(turnCount == 1){
 				r.castleTalk(128 + magicCompressedNumber);
@@ -184,11 +184,11 @@ public class MyRobot extends BCAbstractRobot {
     			}
     		}
     		turnCount++;
-    		if(pilgrimsBuilt < nearbyResources && isAffordable(2)){
+    		/*if(pilgrimsBuilt < nearbyResources && isAffordable(2)){
     			pilgrimsBuilt++;
     			return tryBuild(2);
     		}
-    		else{
+    		else{*/
     			if(isAffordable(5)){
     				int magicCompressedNumber2 = (otherCastles.size() + 1) << 14;
     				if(otherCastles.size() > 0){
@@ -207,7 +207,7 @@ public class MyRobot extends BCAbstractRobot {
     				r.signal(magicCompressedNumber2, 2);
     				return tryBuild(5);
     			}
-    		}
+    		//}
     		return null;
     	}
     }
@@ -384,17 +384,28 @@ public class MyRobot extends BCAbstractRobot {
     		
     		turnCount++;
     		
-    		Robot lowestEnemy = null;
+    		Robot closestEnemy = null;
     		for(Robot bot : r.getVisibleRobots()){
-    			if(bot.team != r.me.team && (lowestEnemy == null || bot.health < lowestEnemy.health))
-    				lowestEnemy = bot;
+    			if(bot.team != r.me.team && (closestEnemy == null || getDistance(bot) < getDistance(closestEnemy)) && getDistance(bot) <= attackRange(bot))
+    				closestEnemy = bot;
     		}
-    		if(lowestEnemy != null)
-    			return r.attack(lowestEnemy.x - r.me.x, lowestEnemy.y - r.me.y);
+    		if(closestEnemy != null)
+    			return r.attack(closestEnemy.x - r.me.x, closestEnemy.y - r.me.y);
     		return followPath();
     		//attack if possible
     		//else SMOrc
     		//needs castles to solve symmetry and broadcast it in order to find enemy castles
+    	}
+    	
+    	public int attackRange(Robot bot){
+    		if(bot.unit == 0)
+    			return 100;
+    		if(bot.unit == 3)
+    			return 16;
+    		if(bot.unit == 4)
+    			return 64;
+    		if(bot.unit == 5)
+    			return 16;
     	}
     	
     	public Action targetBlocked(){
