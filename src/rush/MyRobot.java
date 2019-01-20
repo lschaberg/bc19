@@ -163,7 +163,7 @@ public class MyRobot extends BCAbstractRobot {
 				//signal pilgrim to go for karbonite only
 				turnCount++;
 				//pilgrimsBuilt++;
-				return tryBuild(5);
+				return tryBuild(4);
     		}
     		if(turnCount == 1){
 				r.castleTalk(128 + magicCompressedNumber);
@@ -189,7 +189,7 @@ public class MyRobot extends BCAbstractRobot {
     			return tryBuild(2);
     		}
     		else{*/
-    			if(isAffordable(5)){
+    			if(isAffordable(4)){
     				int magicCompressedNumber2 = (otherCastles.size() + 1) << 14;
     				if(otherCastles.size() > 0){
         				magicCompressedNumber2 += compressedCastles.get(0) << 7;
@@ -205,7 +205,7 @@ public class MyRobot extends BCAbstractRobot {
     				}
     				//r.log("binary string: " + binaryString);
     				r.signal(magicCompressedNumber2, 2);
-    				return tryBuild(5);
+    				return tryBuild(4);
     			}
     		//}
     		return null;
