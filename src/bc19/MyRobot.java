@@ -97,6 +97,10 @@ public class MyRobot extends BCAbstractRobot {
     		return (r.me.x - bot.x)*(r.me.x - bot.x) + (r.me.y - bot.y)*(r.me.y - bot.y);
     	}
     	
+    	public int getDistance(int x, int y){
+    		return (r.me.x - x)*(r.me.x - x) + (r.me.y - y)*(r.me.y - y);
+    	}
+    	
     	public int attackRange(Robot bot){
     		if(bot.unit == 0)
     			return 100;
@@ -129,7 +133,7 @@ public class MyRobot extends BCAbstractRobot {
     	boolean topOrLeft = false;
 		int magicCompressedNumber = 0;
 		boolean closestCastle = true;
-		int karboniteReserve = 30;
+		int karboniteReserve = 60;
 		int phase = 1;
 		int phase2Pilgrims = 0;
 		int phase2Resources = 0;
@@ -195,7 +199,6 @@ public class MyRobot extends BCAbstractRobot {
     					compressedCastles.add(bot.castle_talk - 128);
     				}
     			}
-				return tryBuild(2);
     		}
     		if(turnCount == 1){
 				r.castleTalk(128 + magicCompressedNumber);
@@ -296,7 +299,7 @@ public class MyRobot extends BCAbstractRobot {
     					}
     				}
     				else{
-    					for(int i = 0; i < (r.me.x/4) * 4 + 4; i++){
+    					for(int i = 0; i < ((r.getKarboniteMap()[0].length - 1 - r.me.x)/4) * 4 + 4; i++){
     						for(int j = 0; j < r.getKarboniteMap().length; j++){
     							if(r.getKarboniteMap()[j][r.getKarboniteMap()[0].length - 1 - i] || r.getFuelMap()[j][r.getKarboniteMap()[0].length - 1 - i]){
     								phase2Resources++;
@@ -317,7 +320,7 @@ public class MyRobot extends BCAbstractRobot {
     					}
     				}
     				else{
-    					for(int i = 0; i < (r.me.y/4) * 4 + 4; i++){
+    					for(int i = 0; i < ((r.getKarboniteMap().length - 1 - r.me.y)/4) * 4 + 4; i++){
     						for(int j = 0; j < r.getKarboniteMap()[0].length; j++){
     							if(r.getKarboniteMap()[r.getKarboniteMap().length - 1 - i][j] || r.getFuelMap()[r.getKarboniteMap().length - 1 - i][j]){
     								phase2Resources++;
@@ -353,7 +356,7 @@ public class MyRobot extends BCAbstractRobot {
     		if(closestEnemy != null){
     			return r.attack(closestEnemy.x - r.me.x, closestEnemy.y - r.me.y);
     		}
-    		if(ourPilgrims < nearbyResources && phase != 1 && r.karbonite >= karboniteReserve + 10 && isAffordable(2)){
+    		if(ourPilgrims < nearbyResources && phase == 1 && r.karbonite >= karboniteReserve + 10 && isAffordable(2)){
     			return tryBuild(2);
     		}
     		if(phase == 2 && closestCastle && phase2Pilgrims < phase2Resources && r.karbonite >= karboniteReserve + 10 && isAffordable(2)){
@@ -549,7 +552,7 @@ public class MyRobot extends BCAbstractRobot {
     	}
     	
     	public Action followPath(){
-    		if(path.isEmpty())
+    		if(path.isEmpty() || path == null)
     			return null;
     		Pair nextStep = path.poll();
     		if(((nextStep.x - r.me.x)*(nextStep.x - r.me.x) + (nextStep.y - r.me.y)*(nextStep.y - r.me.y)) *  Math.max(1, r.me.unit - 2) > r.fuel){
@@ -557,6 +560,7 @@ public class MyRobot extends BCAbstractRobot {
     			return null;
     		}
 			if(r.getVisibleRobotMap()[target.y][target.x] > 0){
+				path.addFirst(nextStep);
 				return targetBlocked();
 			}
     		if(r.getVisibleRobotMap()[nextStep.y][nextStep.x] > 0){
@@ -886,7 +890,7 @@ public class MyRobot extends BCAbstractRobot {
     			return farming();
     		}
 			for(Robot bot : r.getVisibleRobots()){
-				if(bot.id == r.me.id)
+				if(bot.id == r.me.id || bot.unit > 2)
 					continue;
 				availableResources[bot.y][bot.x] = false;
 			}
@@ -899,6 +903,14 @@ public class MyRobot extends BCAbstractRobot {
     			state = DEPOSITING;
 				return depositing();
 			}
+    		if(!r.getFuelMap()[r.me.y][r.me.x] && !r.getKarboniteMap()[r.me.y][r.me.x]){
+    			path = search(availableResources);
+    			if(path == null){
+    				return null;
+    			}
+    			target = path.pollLast();
+    			path.add(target);
+    		}
     		//farm
     		return r.mine();
     	}
@@ -941,7 +953,45 @@ public class MyRobot extends BCAbstractRobot {
     			return followPath();
     		}
     		if(state == DEPOSITING){
-    			return farming();
+    			boolean hasNearbyBuilding = false;
+    			boolean[][] nearbyBuildings = new boolean[availableResources.length][availableResources[0].length];
+    			Robot[] visibleRobots = r.getVisibleRobots();
+    			for(int i = 0; i < visibleRobots.length; i++){
+					if(visibleRobots[i].unit <= 1 && visibleRobots[i].team == r.me.team){
+						for(int j = -1; j <= 1; j++){
+							for(int k = -1; k <= 1; k++){
+								if(inMap(visibleRobots[i].x + j, visibleRobots[i].y + k) && r.getPassableMap()[visibleRobots[i].y + k][visibleRobots[i].x + j] && (r.getVisibleRobotMap()[visibleRobots[i].y + k][visibleRobots[i].x + j] <= 0 || r.getVisibleRobotMap()[visibleRobots[i].y + k][visibleRobots[i].x + j] == r.me.id)){
+									nearbyBuildings[visibleRobots[i].y + k][visibleRobots[i].x + j] = true;
+									hasNearbyBuilding = true;
+								}
+							}
+						}
+					}
+    			}
+    			if(!hasNearbyBuilding){
+	    			for(int i = -1; i <= 1; i++){
+	    				for(int j = -1; j <= 1; j++){
+	    					if(inMap(r.me.x + j, r.me.y + i) && isAffordable(1) && r.getVisibleRobotMap()[r.me.y + i][r.me.x + j] <= 0 && r.getPassableMap()[r.me.y + i][r.me.x + j] == true && r.getKarboniteMap()[r.me.y + i][r.me.x + j] == false && r.getFuelMap()[r.me.y + i][r.me.x + j] == false){
+	    						return r.buildUnit(1, j, i);
+	    					}
+	    				}
+	    			}
+	    			for(int i = -1; i <= 1; i++){
+	    				for(int j = -1; j <= 1; j++){
+	    					if(inMap(r.me.x + j, r.me.y + i) && isAffordable(1) && r.getVisibleRobotMap()[r.me.y + i][r.me.x + j] <= 0 && r.getPassableMap()[r.me.y + i][r.me.x + j] == true){
+	    						return r.buildUnit(1, j, i);
+	    					}
+	    				}
+	    			}
+	    			return null;
+    			}
+    			
+				path = search(nearbyBuildings);
+				if(!path.isEmpty()){
+        			target = path.pollLast();
+        			path.add(target);
+				}
+				return depositing();
     		}
     		return null;
     	}
@@ -1142,9 +1192,10 @@ public class MyRobot extends BCAbstractRobot {
     	ArrayList<Pair> enemyCastles = new ArrayList<Pair>(3);
     	int stepsTaken = 0;
 		boolean closestCastle = true;
-		boolean[][] lineMap;
+		boolean[][] frontLineMap;
+		boolean[][] backLineMap;
 		Robot myCastle;
-		int phase = 1;
+		int phase = 2;
 		int castle1short = 0;
 		int castle1long = 0;
 		int castle2short = 0;
@@ -1152,12 +1203,13 @@ public class MyRobot extends BCAbstractRobot {
 		int castle3short = 0;
 		int castle3long = 0;
     	boolean panicMode = false;
+    	int lineFront;
 
     	
     	
     	public Action robotTurn(){
     		if(turnCount == 0){
-    			lineMap = new boolean[r.getFuelMap()[0].length][r.getFuelMap().length];
+    			backLineMap = new boolean[r.getFuelMap().length][r.getFuelMap()[0].length];
     			for(int i = 0; i < r.getPassableMap().length/2; i++){
     				for(int j = 0; j < r.getPassableMap()[0].length/2; j++){
     					if(r.getPassableMap()[i][j] != r.getPassableMap()[r.getPassableMap().length -1 - i][j]){
@@ -1165,11 +1217,14 @@ public class MyRobot extends BCAbstractRobot {
     					}
     				}
     			}
+    			
     			if(verticallySymmetric){
     				topOrLeft = r.getKarboniteMap()[0].length - r.me.x * 2 > 0;
+    				lineFront = r.getKarboniteMap()[0].length/2 - 1;
     			}
     			else{
     				topOrLeft = r.getKarboniteMap().length - r.me.y * 2 > 0;
+    				lineFront = r.getKarboniteMap().length/2 - 1;
     			}
     			
     			for(Robot bot : r.getVisibleRobots()){
@@ -1191,10 +1246,10 @@ public class MyRobot extends BCAbstractRobot {
     				}
     			}
     			if(verticallySymmetric){
-    				enemyCastles.add(new Pair(lineMap[0].length - 1 - r.me.x, r.me.y));
+    				enemyCastles.add(new Pair(backLineMap[0].length - 1 - r.me.x, r.me.y));
     			}
     			else{
-    				enemyCastles.add(new Pair(r.me.x, lineMap.length - 1 - r.me.y));
+    				enemyCastles.add(new Pair(r.me.x, backLineMap.length - 1 - r.me.y));
     			}
 
 	    		for(Robot bot : r.getVisibleRobots()){
@@ -1204,7 +1259,7 @@ public class MyRobot extends BCAbstractRobot {
 	        					castle1short = bot.x/4;
 	        				}
 	        				else{
-	        					castle1short = (lineMap[0].length - 1 - bot.x)/4;
+	        					castle1short = (backLineMap[0].length - 1 - bot.x)/4;
 	        				}
         					castle1long = bot.y/4;
 	        			}
@@ -1213,7 +1268,7 @@ public class MyRobot extends BCAbstractRobot {
 	        					castle1short = bot.y/4;
 	        				}
 	        				else{
-	        					castle1short = (lineMap.length - 1 - bot.y)/4;
+	        					castle1short = (backLineMap.length - 1 - bot.y)/4;
 	        				}
         					castle1long = bot.x/4;
 	        			}
@@ -1222,125 +1277,44 @@ public class MyRobot extends BCAbstractRobot {
 	        			}
 	        		}
 	    		}
-	    		
-	    		/*for(int i = -3; i <= 3; i++)
-	    			if(verticallySymmetric){
-	    				if(topOrLeft){
-	    					lineMap[myCastle.y + i][myCastle.x + 2] = true;
-	    				}
-	    				else{
-	    					lineMap[myCastle.y + i][myCastle.x - 2] = true;
-	    				}
-	    			}
-	    			else{
-	    				if(topOrLeft){
-	    					lineMap[myCastle.y + 2][myCastle.x + i] = true;
-	    				}
-	    				else{
-	    					lineMap[myCastle.y - 2][myCastle.x + i] = true;
-	    				}
-	    			}
-    			}*/
-	    		
-	    		if(phase == 1){
-		    		path = getPathTo(enemyCastles.get(0));
-		    		target = path.pollLast();
-		    		path.add(target);
-	    		}
-	    		else if(phase == 2){
-    				int lineFront = Math.max(castle1short, Math.max(castle2short, castle3short)) * 4 + 6;
-    				if(verticallySymmetric){
-    					for(int i = 0; i < lineMap.length; i++){
-        					if(topOrLeft){
-        						lineMap[i][lineFront] = true;
-        						lineMap[i][lineFront - 1] = true;
-        					}
-        					else{
-        						lineMap[i][lineMap[0].length - lineFront] = true;
-        						lineMap[i][lineMap[0].length - (lineFront - 1)] = true;
-        					}
+	    			    		
+				if(verticallySymmetric){
+					for(int i = 0; i < backLineMap.length; i++){
+    					if(topOrLeft){
+    						backLineMap[i][lineFront - 1] = true;
     					}
-    				}
-    				else{
-    					for(int i = 0; i < lineMap[0].length; i++){
-        					if(topOrLeft){
-        						lineMap[lineFront][i] = true;
-        						lineMap[lineFront - 1][i] = true;
-        					}
-        					else{
-        						lineMap[lineMap.length - lineFront][i] = true;
-        						lineMap[lineMap.length - (lineFront - 1)][i] = true;
-        					}
+    					else{
+    						backLineMap[i][backLineMap[0].length - lineFront] = true;
     					}
-    				}
-    				path = search(lineMap);
-    				target = path.pollLast();
-    				path.add(target);
-	    		}
-	    	}
-    		
-			/*for(int i = -4; i <= 4; i++){
-				for(int j = -4; j <= 4; j++){
-					if(inMap(r.me.x + i, r.me.y + j) && i*i + j*j <= 16){
-						enemyCastlesMap[r.me.y + j][r.me.x + i] = r.getVisibleRobotMap()[r.me.y + j][r.me.x + i] != 0 && r.getRobot(r.getVisibleRobotMap()[r.me.y + j][r.me.x + i]).unit == 0 && r.getRobot(r.getVisibleRobotMap()[r.me.y + j][r.me.x + i]).team != r.me.team;
 					}
 				}
-			}
-			for(Robot bot : r.getVisibleRobots()){
-				if(bot.unit == 0 && bot.team != r.me.team && enemyCastlesMap[bot.y][bot.x] == false){
-					enemyCastlesMap[bot.y][bot.x] = true;
+				else{
+					for(int i = 0; i < backLineMap[0].length; i++){
+    					if(topOrLeft){
+    						backLineMap[lineFront - 1][i] = true;
+    					}
+    					else{
+    						backLineMap[backLineMap.length - lineFront][i] = true;
+    					}
+					}
 				}
-			}
-			
-    		if(path.isEmpty()){
-				path = search(enemyCastlesMap);
-				//r.log("Path is empty, new path: " + path);
-    			target = path.pollLast();
-    			path.add(target);
-    		}*/
+				path = search(backLineMap);
+				target = path.pollLast();
+				path.add(target);
+	    	}
     		
     		turnCount++;
     		    		
     		Robot closestEnemy = null;
     		for(Robot bot : r.getVisibleRobots()){
-    			if(phase == 1 && bot.signal == 1452){
+    			if(phase == 2 && bot.signal == 1452){
     				r.log("phase change acknowledged");
-    				phase = 2;
-    				int lineFront = Math.max(castle1short, Math.max(castle2short, castle3short)) * 4 + 6;
-    				if(verticallySymmetric){
-    					for(int i = 0; i < lineMap.length; i++){
-        					if(topOrLeft){
-        						lineMap[i][lineFront] = true;
-        						lineMap[i][lineFront - 1] = true;
-        					}
-        					else{
-        						lineMap[i][lineMap[0].length - lineFront] = true;
-        						lineMap[i][lineMap[0].length - (lineFront - 1)] = true;
-        					}
-    					}
-    				}
-    				else{
-    					for(int i = 0; i < lineMap[0].length; i++){
-        					if(topOrLeft){
-        						lineMap[lineFront][i] = true;
-        						lineMap[lineFront - 1][i] = true;
-        					}
-        					else{
-        						lineMap[lineMap.length - lineFront][i] = true;
-        						lineMap[lineMap.length - (lineFront - 1)][i] = true;
-        					}
-    					}
-    				}
-    				path = search(lineMap);
-    				target = path.pollLast();
-    				path.add(target);
+    				phase = 3;
     			}
-    			if(phase == 2){
-    				lineMap[bot.y][bot.x] = false;
-    			}
-    			if(bot.team != r.me.team && (closestEnemy == null || getDistance(bot) < getDistance(closestEnemy)))
+    			if(r.isVisible(bot) && bot.team != r.me.team && (closestEnemy == null || getDistance(bot) < getDistance(closestEnemy)))
     				closestEnemy = bot;
     		}
+			
     		Action move = null;
     		if(closestEnemy != null && getDistance(closestEnemy) <= 16){
     			if(closestEnemy.x > r.me.x){
@@ -1381,57 +1355,116 @@ public class MyRobot extends BCAbstractRobot {
     		if(closestEnemy != null)
     			return r.attack(closestEnemy.x - r.me.x, closestEnemy.y - r.me.y);
     		
-    		if(phase == 1){
-    			int shortDist = 0;
-    			if(verticallySymmetric){
-    				if(topOrLeft){
-    					shortDist = r.me.x - myCastle.x;
-    				}
-    				else{
-    					shortDist = myCastle.x - r.me.x;
-    				}
-    			}
-    			else{
-    				if(topOrLeft){
-    					shortDist = r.me.y - myCastle.y;
-    				}
-    				else{
-    					shortDist = myCastle.y - r.me.y;
-    				}
-    			}
-    			if(shortDist < 2){
-    				if(panicMode){
-    					panicMode = false;
-    					path = getPathTo(target);
-    				}
-    				return followPath();
-    			}
-    		}
-    		else if(phase == 2){
-				if(panicMode){
-					panicMode = false;
-					path = search(lineMap);
+			if(verticallySymmetric){
+				for(int i = 0; i < backLineMap.length; i++){
+					if(topOrLeft){
+						if(r.getVisibleRobotMap()[i][lineFront - 1] == 0){
+							backLineMap[i][lineFront - 1] = true;
+						}
+						else if(r.getVisibleRobotMap()[i][lineFront - 1] > 0){
+							backLineMap[i][lineFront - 1] = false;
+						}
+						if(r.me.x == lineFront - 1 && r.me.y == i)
+							backLineMap[r.me.y][r.me.x] = true;
+					}
+					else{
+						if(r.getVisibleRobotMap()[i][backLineMap[0].length - lineFront] == 0){
+							backLineMap[i][backLineMap[0].length - lineFront] = true;
+						}
+						else if(r.getVisibleRobotMap()[i][backLineMap[0].length - lineFront] > 0){
+							backLineMap[i][backLineMap[0].length - lineFront] = false;
+						}
+						if(r.me.x == backLineMap[0].length - lineFront && r.me.y == i)
+							backLineMap[r.me.y][r.me.x] = true;
+					}
+				}
+			}
+			else{
+				for(int i = 0; i < backLineMap[0].length; i++){
+					if(topOrLeft){
+						if(r.getVisibleRobotMap()[lineFront - 1][i] == 0){
+							backLineMap[lineFront - 1][i] = true;
+						}
+						else if(r.getVisibleRobotMap()[lineFront - 1][i] > 0){
+							backLineMap[lineFront - 1][i] = true;
+						}
+						if(r.me.x == i && r.me.y == lineFront - 1)
+							backLineMap[r.me.y][r.me.x] = true;
+					}
+					else{
+						if(r.getVisibleRobotMap()[backLineMap.length - lineFront][i] == 0){
+							backLineMap[backLineMap.length - lineFront][i] = true;
+						}
+						else if(r.getVisibleRobotMap()[backLineMap.length - lineFront][i] > 0){
+							backLineMap[backLineMap.length - lineFront][i] = false;
+						}
+						if(r.me.x == i && r.me.y == backLineMap.length - lineFront)
+							backLineMap[r.me.y][r.me.x] = true;
+					}
+				}
+			}
+			if(panicMode){
+				panicMode = false;
+				path = search(backLineMap);
+				if(!path.isEmpty()){
 					target = path.pollLast();
 					path.add(target);
 				}
-				return followPath();
-    		}
-    		
-    		return null;
-    		//attack if possible
+			}
+			if(path.isEmpty() && backLineMap[r.me.y][r.me.x]){
+    			frontLineMap = new boolean[r.getFuelMap().length][r.getFuelMap()[0].length];
+    			boolean frontLineOpen = false;
+				if(verticallySymmetric){
+					for(int i = 0; i < backLineMap.length; i++){
+    					if(topOrLeft){
+    						if(r.getVisibleRobotMap()[i][lineFront] == 0 && r.getPassableMap()[i][lineFront]){
+    							frontLineOpen = true;
+        						frontLineMap[i][lineFront] = true;
+    						}
+    					}
+    					else{
+    						if(r.getVisibleRobotMap()[i][backLineMap[0].length - lineFront - 1] == 0 && r.getPassableMap()[i][backLineMap[0].length - lineFront - 1]){
+    							frontLineOpen = true;
+        						frontLineMap[i][backLineMap[0].length - lineFront - 1] = true;
+    						}
+    					}
+					}
+				}
+				else{
+					for(int i = 0; i < backLineMap[0].length; i++){
+						if(topOrLeft){
+							if(r.getVisibleRobotMap()[lineFront][i] == 0 && r.getPassableMap()[lineFront][i]){
+    							frontLineOpen = true;
+        						frontLineMap[lineFront][i] = true;
+							}
+						}
+    					else{
+    						if(r.getVisibleRobotMap()[backLineMap[0].length - lineFront - 1][i] == 0 && r.getPassableMap()[backLineMap[0].length - lineFront - 1][i]){
+    							frontLineOpen = true;
+        						frontLineMap[backLineMap[0].length - lineFront - 1][i] = true;
+    						}
+    					}
+					}
+				}
+				if(frontLineOpen){
+					path = search(frontLineMap);
+					target = path.pollLast();
+					path.add(target);
+				}
+			}
+			return followPath();
+  
+			//attack if possible
     		//else SMOrc
     		//needs castles to solve symmetry and broadcast it in order to find enemy castles
     	}
     	
     	public Action targetBlocked(){
-    		if(phase == 1){
-    			return null;
-    		}
-    		else if(phase == 2){
-				path = search(lineMap);
+			path = search(backLineMap);
+			if(!path.isEmpty()){
 				target = path.pollLast();
 				path.add(target);
-    		}
+			}
     		return followPath();
     	}
     }
