@@ -101,6 +101,10 @@ public class MyRobot extends BCAbstractRobot {
     		return (r.me.x - x)*(r.me.x - x) + (r.me.y - y)*(r.me.y - y);
     	}
     	
+    	public int getDistance(int x, int y, int x2, int y2){
+    		return (x2 - x)*(x2 - x) + (y2 - y)*(y2 - y);
+    	}
+    	
     	public int attackRange(Robot bot){
     		if(bot.unit == 0)
     			return 100;
@@ -121,6 +125,9 @@ public class MyRobot extends BCAbstractRobot {
     		return null;
     	}
     	
+    	public boolean passable(int y, int x){
+    		return inMap(x, y) && r.getPassableMap()[y][x];
+    	}
     }
 
     public class Castle extends AbstractRobot{
@@ -128,15 +135,16 @@ public class MyRobot extends BCAbstractRobot {
     	ArrayList<Robot> otherCastles = new ArrayList<Robot>(2);
     	ArrayList<Integer> compressedCastles = new ArrayList<Integer>(2);
     	int nearbyResources = 0;
+    	int assignedResources = 0;
     	int nearbyKarbonite = 0;
     	boolean verticallySymmetric = false;
     	boolean topOrLeft = false;
 		int magicCompressedNumber = 0;
 		boolean closestCastle = true;
 		int karboniteReserve = 60;
-		int phase = 1;
-		int phase2Pilgrims = 0;
-		int phase2Resources = 0;
+		int phase = 2;
+		int pilgrimsBuilt = 0;
+		int fuelReserve = 200;
     	
     	public Castle(MyRobot r){
     		this.r = r;
@@ -158,17 +166,6 @@ public class MyRobot extends BCAbstractRobot {
     			else{
     				topOrLeft = r.getKarboniteMap().length - r.me.y * 2 > 0;
     			}
-    			for(int i = -8; i <= 8; i++){
-    				for(int j = -8; j <= 8; j++){
-    					if(inMap(r.me.x + i, r.me.y + j) && (r.karboniteMap[r.me.y + j][r.me.x + i] || r.fuelMap[r.me.y + j][r.me.x + i]) && i*i + j*j <= 100){
-    						nearbyResources++;
-    						if(r.karboniteMap[r.me.y + j][r.me.x + i]){
-    							nearbyKarbonite++;
-    						}
-    					}
-    				}
-    			}
-    			r.log("nearby resources: " + nearbyResources);
 				if(verticallySymmetric){
 					if(topOrLeft){
         				magicCompressedNumber = (r.me.y/4 << 3)  + r.me.x/4;
@@ -199,6 +196,8 @@ public class MyRobot extends BCAbstractRobot {
     					compressedCastles.add(bot.castle_talk - 128);
     				}
     			}
+    			pilgrimsBuilt++;
+    			return tryBuild(2);
     		}
     		if(turnCount == 1){
 				r.castleTalk(128 + magicCompressedNumber);
@@ -230,12 +229,95 @@ public class MyRobot extends BCAbstractRobot {
     					closestCastle = Math.abs((magicCompressedNumber >> 3) % 16 - r.getKarboniteMap()[0].length/4) > Math.abs((compressedCastles.get(1) >> 3) % 16 - r.getKarboniteMap()[0].length/4);
     				}
     			}
-
-    			/*if(closestCastle){
-    				return tryBuild(4); //tell it to scout by pathing to opposite enemy castle and following half the path, then retreating on contact
-    			}*/
+    			
+    			if(verticallySymmetric){
+    				if(topOrLeft){
+    					for(int i = 0; i <= r.getPassableMap().length; i++){
+    						for(int j = 0; j < r.getPassableMap()[0].length/2 - 2; j++){
+    							if(inMap(j, i) && (r.karboniteMap[i][j] || r.fuelMap[i][j])){
+    								boolean nearMe = true;
+    								for(Integer c : compressedCastles){
+    									if(getDistance(j, i, r.me.x/4 *4, r.me.y/4 *4) > getDistance(j, i, (c % 8) * 4, ((c >> 3) % 16) * 4)){
+    										nearMe = false;
+    									}
+    								}
+    								if(nearMe){
+    									assignedResources++;
+    									if(getDistance(j, i) < 25){
+    										nearbyResources++;
+    									}
+    								}
+    							}
+    						}
+    					}
+    				}
+    				else{
+    					for(int i = 0; i <= r.getPassableMap().length; i++){
+    						for(int j = r.getPassableMap()[0].length/2 + 2; j < r.getPassableMap()[0].length; j++){
+    							if(inMap(j, i) && (r.karboniteMap[i][j] || r.fuelMap[i][j])){
+    								boolean nearMe = true;
+    								for(Integer c : compressedCastles){
+    									if(getDistance(j, i, (r.getPassableMap()[0].length - r.me.x)/4 *4, r.me.y/4 *4) > getDistance(j, i, c % 8, (c >> 3) % 16)){
+    										nearMe = false;
+    									}
+    								}
+    								if(nearMe){
+    									assignedResources++;
+    									if(getDistance(j, i) < 25){
+    										nearbyResources++;
+    									}
+    								}
+    							}
+    						}
+    					}
+    				}
+    			}
+    			else{
+    				if(topOrLeft){
+    					for(int i = 0; i <= r.getPassableMap()[0].length; i++){
+    						for(int j = 0; j < r.getPassableMap().length/2 - 2; j++){
+    							if(inMap(i, j) && (r.karboniteMap[j][i] || r.fuelMap[j][i])){
+    								boolean nearMe = true;
+    								for(Integer c : compressedCastles){
+    									if(getDistance(i, j, r.me.x/4 *4, r.me.y/4 *4) > getDistance(i, j, ((c >> 3) % 16) * 4, (c % 8) * 4)){
+    										nearMe = false;
+    									}
+    								}
+    								if(nearMe){
+    									assignedResources++;
+    									if(getDistance(i, j) < 25){
+    										nearbyResources++;
+    									}
+    								}
+    							}
+    						}
+    					}
+    				}
+    				else{
+    					for(int i = 0; i <= r.getPassableMap()[0].length; i++){
+    						for(int j = r.getPassableMap().length/2 + 2; j < r.getPassableMap().length; j++){
+    							if(inMap(i, j) && (r.karboniteMap[j][i] || r.fuelMap[j][i])){
+    								boolean nearMe = true;
+    								for(Integer c : compressedCastles){
+    									if(getDistance(i, j, r.me.x/4 *4, (r.getPassableMap().length - r.me.y)/4 *4) > getDistance(i, j, ((c >> 3) % 16) * 4, (c % 8) * 4)){
+    										nearMe = false;
+    									}
+    								}
+    								if(nearMe){
+    									assignedResources++;
+    									if(getDistance(i, j) < 25){
+    										nearbyResources++;
+    									}
+    								}
+    							}
+    						}
+    					}
+    				}
+    			}
     		}
+    		
     		turnCount++;
+    		
     		int enemyCrusaders = 0;
     		int enemyRangers = 0;
     		int enemyMages = 0;
@@ -243,9 +325,12 @@ public class MyRobot extends BCAbstractRobot {
     		int ourRangers = 0;
     		int ourMages = 0;
     		int ourPilgrims = 0;
-    		boolean othersNeedRangers = false;
     		Robot closestEnemy = null;
+    		boolean lineFull = true;
     		for(Robot bot : r.getVisibleRobots()){
+    			if(bot.castle_talk == 99 || turnCount < 100){
+    				lineFull = false;
+    			}
     			if(bot.team != r.me.team){
         			if(closestEnemy == null || getDistance(bot) < getDistance(closestEnemy))
         				closestEnemy = bot;
@@ -273,76 +358,13 @@ public class MyRobot extends BCAbstractRobot {
     					ourMages++;
     				}
     			}
-    			else{
-    				for(Robot c : otherCastles){
-    					if(c.id == bot.id){
-    						r.log("castle talk: " + bot.castle_talk);
-    						othersNeedRangers |= bot.castle_talk < 7 && bot.castle_talk < ourRangers;
-    					}
-    				}
-    			}
     		}
-    		r.log("our rangers: " + ourRangers);
-    		r.castleTalk(ourRangers);
-    		
-    		if(phase == 1 && closestCastle && ((!othersNeedRangers && ourRangers >= 7) || turnCount > 100)){
-    			phase = 2;
-    			r.signal(1452, 50*50);
-    			if(verticallySymmetric){
-    				if(topOrLeft){
-    					for(int i = 0; i < (r.me.x/4) * 4 + 4; i++){
-    						for(int j = 0; j < r.getKarboniteMap().length; j++){
-    							if(r.getKarboniteMap()[j][i] || r.getFuelMap()[j][i]){
-    								phase2Resources++;
-    							}
-    						}
-    					}
-    				}
-    				else{
-    					for(int i = 0; i < ((r.getKarboniteMap()[0].length - 1 - r.me.x)/4) * 4 + 4; i++){
-    						for(int j = 0; j < r.getKarboniteMap().length; j++){
-    							if(r.getKarboniteMap()[j][r.getKarboniteMap()[0].length - 1 - i] || r.getFuelMap()[j][r.getKarboniteMap()[0].length - 1 - i]){
-    								phase2Resources++;
-    							}
-    						}
-    					}
-    				}
-    			}
-    			else{
-    				if(topOrLeft){
-    					for(int i = 0; i < (r.me.y/4) * 4 + 4; i++){
-    						for(int j = 0; j < r.getKarboniteMap()[0].length; j++){
-    							if(r.getKarboniteMap()[i][j] || r.getFuelMap()[i][j]){
-    								r.log("resource found at: " + j + ", " + i);
-    								phase2Resources++;
-    							}
-    						}
-    					}
-    				}
-    				else{
-    					for(int i = 0; i < ((r.getKarboniteMap().length - 1 - r.me.y)/4) * 4 + 4; i++){
-    						for(int j = 0; j < r.getKarboniteMap()[0].length; j++){
-    							if(r.getKarboniteMap()[r.getKarboniteMap().length - 1 - i][j] || r.getFuelMap()[r.getKarboniteMap().length - 1 - i][j]){
-    								phase2Resources++;
-    							}
-    						}
-    					}
-    				}
-    			}
-    			phase2Resources -= (nearbyResources + 3 * otherCastles.size() - 2); //literally just guessing cause we don't know other castles' resources
-    			r.log("phase 2 resources: " + phase2Resources);
-    			return null; //to ensure the signal is sent
+    		if((lineFull && phase == 2) || turnCount == 319){
+    			r.signal(1452, 4096);
+    			phase = 3;
     		}
-    		else if(phase == 1 && !closestCastle){
-    			for(Robot bot : r.getVisibleRobots()){
-    				if(bot.signal == 1452){
-    					phase = 2;
-    				}
-    			}
-    		}
-    		
+    		    		
     		if(isAffordable(5) && enemyMages  > ourMages){ //change to preachers if rangers have problems
-    			r.log("Building a mage because they have " + enemyMages + " and we have " + ourMages);
     			return tryBuild(5);
     		}
     		if(isAffordable(5) && enemyCrusaders > ourMages){
@@ -351,32 +373,14 @@ public class MyRobot extends BCAbstractRobot {
     		if(isAffordable(4) && enemyRangers > ourRangers){
     			return tryBuild(4);
     		}
-    		/*if(ourPilgrims < nearbyKarbonite && phase == 1 && r.karbonite >= karboniteReserve + 10 && isAffordable(2))
-    			return tryBuild(2);*/
     		if(closestEnemy != null){
     			return r.attack(closestEnemy.x - r.me.x, closestEnemy.y - r.me.y);
     		}
-    		if(ourPilgrims < nearbyResources && phase == 1 && r.karbonite >= karboniteReserve + 10 && isAffordable(2)){
+    		if(pilgrimsBuilt < assignedResources && r.karbonite >= 40 && isAffordable(2)){
+    			pilgrimsBuilt++;
     			return tryBuild(2);
     		}
-    		if(phase == 2 && closestCastle && phase2Pilgrims < phase2Resources && r.karbonite >= karboniteReserve + 10 && isAffordable(2)){
-    			phase2Pilgrims++;
-    			r.signal(69, 2);
-    			return tryBuild(2);
-    		}
-			if(isAffordable(4) && !othersNeedRangers && (ourRangers < 7 || closestCastle) && r.karbonite >= karboniteReserve + 25){
-				r.log("karbonite: " + r.karbonite);
-				r.log("karbonite reserve: " + karboniteReserve);
-				r.log("others need rangers: " + othersNeedRangers);
-				int magicCompressedNumber2 = (otherCastles.size() + 1) << 14;
-				if(otherCastles.size() > 0){
-    				magicCompressedNumber2 += (compressedCastles.get(0) % 8) << 3;
-    				if(otherCastles.size() > 1){
-    					magicCompressedNumber2 += compressedCastles.get(1) % 8;
-    				}
-				}
-				magicCompressedNumber2 += (phase - 1) << 6;
-				r.signal(magicCompressedNumber2, 2);
+			if(isAffordable(4) && r.karbonite >= karboniteReserve + 50 - ((magicCompressedNumber % 8) * 5) && r.fuel >= fuelReserve + 50){
 				return tryBuild(4);
 			}
     		return null;
@@ -384,9 +388,103 @@ public class MyRobot extends BCAbstractRobot {
     }
     
     private class Church extends AbstractRobot{
-    	
     	public Church(MyRobot r){
     		this.r = r;
+    	}
+    	
+		int fuelReserve = 200;
+		int karboniteReserve = 60;
+		int magicCompressedNumber;
+		boolean verticallySymmetric = false;
+		boolean topOrLeft = false;
+		boolean firstTurn = true;
+    	
+    	public Action robotTurn(){
+    		if(firstTurn){
+    			for(int i = 0; i < r.getPassableMap().length/2; i++){
+    				for(int j = 0; j < r.getPassableMap()[0].length/2; j++){
+    					if(r.getPassableMap()[i][j] != r.getPassableMap()[r.getPassableMap().length -1 - i][j]){
+    						verticallySymmetric = true;
+    					}
+    				}
+    			}
+    			if(verticallySymmetric){
+    				topOrLeft = r.getKarboniteMap()[0].length - r.me.x * 2 > 0;
+    			}
+    			else{
+    				topOrLeft = r.getKarboniteMap().length - r.me.y * 2 > 0;
+    			}
+				if(verticallySymmetric){
+					if(topOrLeft){
+        				magicCompressedNumber = (r.me.y/4 << 3)  + r.me.x/4;
+					}
+					else{
+        				magicCompressedNumber = (r.me.y/4 << 3)  + (r.getKarboniteMap()[0].length - 1 - r.me.x)/4;
+					}
+				}
+				else{
+					if(topOrLeft){
+        				magicCompressedNumber = (r.me.x/4 << 3)  + r.me.y/4;
+					}
+					else{
+        				magicCompressedNumber = (r.me.x/4 << 3)  + (r.getKarboniteMap().length - 1 - r.me.y)/4;
+					}
+				}
+				firstTurn = false;
+    		}
+    		
+    		int enemyCrusaders = 0;
+    		int enemyRangers = 0;
+    		int enemyMages = 0;
+    		int enemyEcon = 0;
+    		int ourCrusaders = 0;
+    		int ourRangers = 0;
+    		int ourMages = 0;
+    		int ourPilgrims = 0;
+    		Robot closestEnemy = null;
+    		for(Robot bot : r.getVisibleRobots()){
+    			if(bot.team != r.me.team && getDistance(bot) <= 100){
+        			if(closestEnemy == null || getDistance(bot) < getDistance(closestEnemy))
+        				closestEnemy = bot;
+        			if(bot.unit == 1 || bot.unit == 2){
+        				enemyEcon++;
+        			}
+    				if(bot.unit == 3){
+    					enemyCrusaders++;
+    				}
+    				else if(bot.unit == 4){
+    					enemyRangers++;
+    				}
+    				else if(bot.unit == 5){
+    					enemyMages++;
+    				}
+    			}
+    			else if(getDistance(bot) <= 100){
+    				if(bot.unit == 2){
+    					ourPilgrims++;
+    				}
+    				if(bot.unit == 3){
+    					ourCrusaders++;
+    				}
+    				else if(bot.unit == 4){
+    					ourRangers++;
+    				}
+    				else if(bot.unit == 5){
+    					ourMages++;
+    				}
+    			}
+    		}
+    		    		
+    		if(isAffordable(5) && enemyMages + enemyCrusaders > ourMages){ //change to preachers if rangers have problems
+    			return tryBuild(5);
+    		}
+    		if(isAffordable(4) && enemyRangers + enemyEcon > ourRangers){
+    			return tryBuild(4);
+    		}
+    		if(isAffordable(4) && r.karbonite >= karboniteReserve + 50 - ((magicCompressedNumber % 8) * 5) && r.fuel >= fuelReserve + 50){
+    			return tryBuild(4);
+    		}
+    		return null;
     	}
     }
 
@@ -508,8 +606,8 @@ public class MyRobot extends BCAbstractRobot {
     		while(!openSet.isEmpty()){
     			current = null;
     			nodesChecked++;
-    			if(nodesChecked % 10 == 0)
-    				r.log("Nodes checked: " + nodesChecked);
+    			//if(nodesChecked % 10 == 0)
+    				//r.log("Nodes checked: " + nodesChecked);
     			for(Pair p : openSet){
     				if(current == null)
     					current = p;
@@ -608,8 +706,8 @@ public class MyRobot extends BCAbstractRobot {
     		Pair current;
     		while(!openSet.isEmpty()){
     			nodesChecked++;
-    			if(nodesChecked % 25 == 0)
-    				r.log("BFS Nodes checked: " + nodesChecked);
+    			//if(nodesChecked % 25 == 0)
+    				//r.log("BFS Nodes checked: " + nodesChecked);
     			current = openSet.poll();
     			openMap[current.x][current.y] = false;
     			if(map[current.y][current.x]){
@@ -651,7 +749,6 @@ public class MyRobot extends BCAbstractRobot {
     	int turnCount = 0;
     	boolean panicMode = false;
     	int phase = 1;
-    	Robot closestCastle;
     	boolean verticallySymmetric;
     	boolean topOrLeft;
 
@@ -663,9 +760,11 @@ public class MyRobot extends BCAbstractRobot {
     	private Pair resourcePatch; //durable record of where this pilgrim is farming, only set when it has been reached and claimed
     	
     	private boolean[][] availableResources;
+    	private int[][] previousRobotMap;
     	
     	public Action robotTurn(){
     		if(turnCount == 0){
+    			previousRobotMap = new int[r.getFuelMap().length][r.getFuelMap()[0].length];
     			for(int i = 0; i < r.getPassableMap().length/2; i++){
     				for(int j = 0; j < r.getPassableMap()[0].length/2; j++){
     					if(r.getPassableMap()[i][j] != r.getPassableMap()[r.getPassableMap().length -1 - i][j]){
@@ -680,26 +779,60 @@ public class MyRobot extends BCAbstractRobot {
     				topOrLeft = r.getKarboniteMap().length - r.me.y * 2 > 0;
     			}
 
-    			for(Robot bot : r.getVisibleRobots()){
-    				if(bot.team == r.me.team && bot.unit == 0 && getDistance(bot) < 5){
-    					if(bot.signal % 1024 == 69){
-        					closestCastle = bot;
-    						phase = 2;
+	    		availableResources = new boolean[r.getFuelMap().length][r.getFuelMap()[0].length];
+    			if(verticallySymmetric){
+    				if(topOrLeft){
+    					for(int i = 0; i < availableResources[0].length; i++){
+    						for(int j = 0; j < availableResources.length; j++){
+    							if(i < availableResources[0].length/2 - 2){
+    								availableResources[j][i] = r.getFuelMap()[j][i] || r.getKarboniteMap()[j][i];
+    							}
+    							else{
+    								availableResources[j][i] = false;
+    							}
+    						}
+    					}
+    				}
+    				else{
+    					for(int i = 0; i < availableResources[0].length; i++){
+    						for(int j = 0; j < availableResources.length; j++){
+    							if(i >= availableResources[0].length/2 + 2){
+    								availableResources[j][i] = r.getFuelMap()[j][i] || r.getKarboniteMap()[j][i];
+    							}
+    							else{
+    								availableResources[j][i] = false;
+    							}
+    						}
     					}
     				}
     			}
-	    		boolean[][] tempMap = r.getFuelMap();
-	    		availableResources = new boolean[tempMap.length][tempMap[0].length];
-	    		if(phase == 1){
-		    		for(int i = 0; i < availableResources.length; i++){
-		    			availableResources[i] = tempMap[i].clone();
-		    		}
-		    		tempMap = r.getKarboniteMap();
-		    		for(int i = 0; i < availableResources.length; i++){
-		    			for(int j = 0; j < availableResources[0].length; j++){
-		    				availableResources[i][j] |= tempMap[i][j];
-		    			}
-		    		}
+    			else{
+    				if(topOrLeft){
+    					for(int i = 0; i < availableResources.length; i++){
+    						for(int j = 0; j < availableResources[0].length; j++){
+    							if(i < availableResources.length/2 - 2){
+    								availableResources[i][j] = r.getFuelMap()[i][j] || r.getKarboniteMap()[i][j];
+    							}
+    							else{
+    								availableResources[i][j] = false;
+    							}
+    						}
+    					}
+    				}
+    				else{
+    					for(int i = 0; i < availableResources.length; i++){
+    						for(int j = 0; j < availableResources[0].length; j++){
+    							if(i >= availableResources.length/2 + 2){
+    								availableResources[i][j] = r.getFuelMap()[i][j] || r.getKarboniteMap()[i][j];
+    							}
+    							else{
+    								availableResources[i][j] = false;
+    							}
+    						}
+    					}
+    				}
+    			}
+	    		/*if(phase == 1){
 		    		boolean alone = true;
 		    		for(Robot bot : r.getVisibleRobots()){
 		    			if(bot.unit == 2 && bot.team == r.me.team && bot.id != r.me.id){
@@ -714,61 +847,9 @@ public class MyRobot extends BCAbstractRobot {
 		    			path = search(availableResources);
 		    		}
 	    		}
-	    		else if(phase == 2){
-	    			if(verticallySymmetric){
-	    				if(topOrLeft){
-	    					for(int i = 0; i < tempMap[0].length; i++){
-	    						for(int j = 0; j < tempMap.length; j++){
-	    							if(i < (closestCastle.x/4) * 4 + 4){
-	    								availableResources[j][i] = tempMap[j][i] || r.getKarboniteMap()[j][i];
-	    							}
-	    							else{
-	    								availableResources[j][i] = false;
-	    							}
-	    						}
-	    					}
-	    				}
-	    				else{
-	    					for(int i = 0; i < tempMap[0].length; i++){
-	    						for(int j = 0; j < tempMap.length; j++){
-	    							if(i < (closestCastle.x/4) * 4 + 4){
-	    								availableResources[j][tempMap[0].length - 1 - i] = tempMap[j][tempMap[0].length - 1 - i] || r.getKarboniteMap()[j][tempMap[0].length - 1 - i];
-	    							}
-	    							else{
-	    								availableResources[j][tempMap[0].length - 1 - i] = false;
-	    							}
-	    						}
-	    					}
-	    				}
-	    			}
-	    			else{
-	    				if(topOrLeft){
-	    					for(int i = 0; i < tempMap.length; i++){
-	    						for(int j = 0; j < tempMap[0].length; j++){
-	    							if(i < (closestCastle.y/4) * 4 + 4){
-	    								availableResources[i][j] = tempMap[i][j] || r.getKarboniteMap()[i][j];
-	    							}
-	    							else{
-	    								availableResources[i][j] = false;
-	    							}
-	    						}
-	    					}
-	    				}
-	    				else{
-	    					for(int i = 0; i < tempMap.length; i++){
-	    						for(int j = 0; j < tempMap[0].length; j++){
-	    							if(i < (closestCastle.y/4) * 4 + 4){
-	    								availableResources[j][tempMap.length - 1 - i] = tempMap[j][tempMap.length - 1 - i] || r.getKarboniteMap()[j][tempMap.length - 1 - i];
-	    							}
-	    							else{
-	    								availableResources[j][tempMap.length - 1 - i] = false;
-	    							}
-	    						}
-	    					}
-	    				}
-	    			}
+	    		else if(phase == 2){*/
 	    			path = search(availableResources);
-	    		}
+	    		//}
     			if(!path.isEmpty()){
 	    			target = path.pollLast();
 	    			path.add(target);
@@ -784,7 +865,7 @@ public class MyRobot extends BCAbstractRobot {
     		
     		Robot closestEnemy = null;
     		for(Robot bot : r.getVisibleRobots()){
-    			if(bot.team != r.me.team && (closestEnemy == null || getDistance(bot) < getDistance(closestEnemy)))
+    			if(bot.team != r.me.team && (closestEnemy == null || getDistance(bot) < getDistance(closestEnemy)) && bot.unit > 2)
     				closestEnemy = bot;
     		}
     		Action move = null;
@@ -824,7 +905,6 @@ public class MyRobot extends BCAbstractRobot {
     			panicMode = true;
     			return move;
     		}
-
     		if(panicMode){
     			panicMode = false;
     			if(state == FARMING){
@@ -833,6 +913,7 @@ public class MyRobot extends BCAbstractRobot {
     			}
     			path = getPathTo(target);
     		}
+    		
     		switch(state){
     		case TRAVELING: return traveling();
     		case FARMING: return farming();
@@ -852,7 +933,7 @@ public class MyRobot extends BCAbstractRobot {
 					if(visibleRobots[i].unit <= 1 && visibleRobots[i].team == r.me.team){
 						for(int j = -1; j <= 1; j++){
 							for(int k = -1; k <= 1; k++){
-								if(inMap(visibleRobots[i].x + j, visibleRobots[i].y + k) && r.getPassableMap()[visibleRobots[i].y + k][visibleRobots[i].x + j] && (r.getVisibleRobotMap()[visibleRobots[i].y + k][visibleRobots[i].x + j] <= 0 || r.getVisibleRobotMap()[visibleRobots[i].y + k][visibleRobots[i].x + j] == r.me.id)){
+								if(inMap(visibleRobots[i].x + j, visibleRobots[i].y + k) && r.getPassableMap()[visibleRobots[i].y + k][visibleRobots[i].x + j] && (r.getVisibleRobotMap()[visibleRobots[i].y + k][visibleRobots[i].x + j] <= 0 || r.getVisibleRobotMap()[visibleRobots[i].y + k][visibleRobots[i].x + j] == r.me.id) && getDistance(visibleRobots[i].x + j, visibleRobots[i].y + k) < 25){
 									nearbyBuildings[visibleRobots[i].y + k][visibleRobots[i].x + j] = true;
 									hasNearbyBuilding = true;
 								}
@@ -889,11 +970,24 @@ public class MyRobot extends BCAbstractRobot {
 				
     			return farming();
     		}
-			for(Robot bot : r.getVisibleRobots()){
-				if(bot.id == r.me.id || bot.unit > 2)
-					continue;
-				availableResources[bot.y][bot.x] = false;
-			}
+    		
+    		for(int i = -10; i <= 10; i++){
+    			for(int j = -10; j <= 10; j++){
+    				if(inMap(r.me.x + i, r.me.y + j) && getDistance(r.me.x + i, r.me.y + j) <= 100){
+    					if(r.getVisibleRobotMap()[r.me.y + j][r.me.x + i] > 0 && (r.getRobot(r.getVisibleRobotMap()[r.me.y + j][r.me.x + i]).unit > 2 || r.getVisibleRobotMap()[r.me.y + j][r.me.x + i] == r.me.id)){
+    						continue;
+    					}
+    					if(r.getVisibleRobotMap()[r.me.y + j][r.me.x + i] > 0 && r.getVisibleRobotMap()[r.me.y + j][r.me.x + i] == previousRobotMap[r.me.y + j][r.me.x + i]){
+        					availableResources[r.me.y + j][r.me.x + i] = false;
+    					}
+    				}
+    			}
+    		}
+    		
+    		for(int i = 0; i < previousRobotMap.length; i++){
+    			previousRobotMap[i] = r.getVisibleRobotMap()[i].clone();
+    		}
+    		
     		return followPath();
     	}
     	
@@ -934,10 +1028,13 @@ public class MyRobot extends BCAbstractRobot {
     	}
     	
     	public Action targetBlocked(){
-    		if(r.getRobot(r.getVisibleRobotMap()[target.y][target.x]).unit != 2)
+    		if(r.getRobot(r.getVisibleRobotMap()[target.y][target.x]).unit > 2)
     			return null;
     		//r.log("Pilgrim's target is blocked");
     		if(state == TRAVELING){
+    			if(availableResources[target.y][target.x]){
+    				return null;
+    			}
     			path = search(availableResources);
     			if(path == null){
     				//r.log("Seen everything");
@@ -1029,17 +1126,12 @@ public class MyRobot extends BCAbstractRobot {
     			enemyCastlesMap = new boolean[r.getFuelMap().length][r.getFuelMap()[0].length];
     			for(Robot bot : r.getVisibleRobots()){
     				if(bot.team == r.me.team && r.isRadioing(bot) && bot.unit == 0){
-    					r.log("received castle count :" + (bot.signal >> 14));
     					castle2 = (bot.signal >> 14) > 1;
     					castle3 = (bot.signal >> 14) > 2;
     					int castle2long = ((int) ((bot.signal >> 10) % 16)) * 4;
 	        			int castle2short = ((int) ((bot.signal >> 7) % 8)) * 4;
     					int castle3long = ((int) ((bot.signal >> 3) % 16)) * 4;
 	        			int castle3short = ((int) (bot.signal % 8)) * 4;
-	        			r.log("Castle 2 long: " + castle2long);
-	        			r.log("Castle 2 short: " + castle2short);
-	        			r.log("Castle 3 long: " + castle3long);
-	        			r.log("Castle 3 short: " + castle3short);
     					if(verticallySymmetric){
     						if(topOrLeft){
     							if(castle2){
@@ -1066,7 +1158,6 @@ public class MyRobot extends BCAbstractRobot {
     								}
     							}
     							if(castle3){
-    								r.log("castle 3 recognized");
     								for(int i = 0; i < 4; i++){
     									for(int j = 0; j < 4; j++){
     										enemyCastlesMap[castle3long + i][castle3short + j] = true;
@@ -1233,16 +1324,11 @@ public class MyRobot extends BCAbstractRobot {
     				}
 
     				if(bot.team == r.me.team && r.isRadioing(bot) && bot.unit == 0){
-    					r.log("received castle count :" + (bot.signal >> 14));
     					castle2 = (bot.signal >> 14) > 1;
     					castle3 = (bot.signal >> 14) > 2;
 	        			castle2short = ((int) ((bot.signal >> 3) % 8));
 	        			castle3short = ((int) (bot.signal % 8));
 	        			phase = ((bot.signal >> 6) % 4) + 1;
-	        			r.log("Castle 2 long: " + castle2long);
-	        			r.log("Castle 2 short: " + castle2short);
-	        			r.log("Castle 3 long: " + castle3long);
-	        			r.log("Castle 3 short: " + castle3short);
     				}
     			}
     			if(verticallySymmetric){
@@ -1310,6 +1396,42 @@ public class MyRobot extends BCAbstractRobot {
     			if(phase == 2 && bot.signal == 1452){
     				r.log("phase change acknowledged");
     				phase = 3;
+    				if(verticallySymmetric){
+    					if(topOrLeft){
+    						target.x = backLineMap[0].length - 1;
+    						target.y = r.me.y;
+    						while(!passable(target.y, target.x)){
+    							target.x--;
+    						}
+    						path = getPathTo(target);
+    					}
+    					else{
+    						target.x = 0;
+    						target.y = r.me.y;
+    						while(!passable(target.y, target.x)){
+    							target.x++;
+    						}
+    						path = getPathTo(target);
+    					}
+    				}
+    				else{
+    					if(topOrLeft){
+    						target.y = backLineMap.length - 1;
+    						target.x = r.me.x;
+    						while(!passable(target.y, target.x)){
+    							target.y--;
+    						}
+    						path = getPathTo(target);
+    					}
+    					else{
+    						target.y = 0;
+    						target.x = r.me.x;
+    						while(!passable(target.y, target.x)){
+    							target.y++;
+    						}
+    						path = getPathTo(target);
+    					}
+    				}
     			}
     			if(r.isVisible(bot) && bot.team != r.me.team && (closestEnemy == null || getDistance(bot) < getDistance(closestEnemy)))
     				closestEnemy = bot;
@@ -1386,7 +1508,7 @@ public class MyRobot extends BCAbstractRobot {
 							backLineMap[lineFront - 1][i] = true;
 						}
 						else if(r.getVisibleRobotMap()[lineFront - 1][i] > 0){
-							backLineMap[lineFront - 1][i] = true;
+							backLineMap[lineFront - 1][i] = false;
 						}
 						if(r.me.x == i && r.me.y == lineFront - 1)
 							backLineMap[r.me.y][r.me.x] = true;
@@ -1405,25 +1527,31 @@ public class MyRobot extends BCAbstractRobot {
 			}
 			if(panicMode){
 				panicMode = false;
-				path = search(backLineMap);
-				if(!path.isEmpty()){
-					target = path.pollLast();
-					path.add(target);
+				if(phase == 2){
+					path = search(backLineMap);
+					if(!path.isEmpty()){
+						target = path.pollLast();
+						path.add(target);
+					}
+				}
+				else{
+					path = getPathTo(target);
 				}
 			}
-			if(path.isEmpty() && backLineMap[r.me.y][r.me.x]){
+			if(path.isEmpty() && backLineMap[r.me.y][r.me.x] && phase == 2){
     			frontLineMap = new boolean[r.getFuelMap().length][r.getFuelMap()[0].length];
     			boolean frontLineOpen = false;
+    			boolean adjacentBackImpassable = false;
 				if(verticallySymmetric){
 					for(int i = 0; i < backLineMap.length; i++){
     					if(topOrLeft){
-    						if(r.getVisibleRobotMap()[i][lineFront] == 0 && r.getPassableMap()[i][lineFront]){
+    						if(r.getVisibleRobotMap()[i][lineFront] == 0 && r.getPassableMap()[i][lineFront] && !(passable(i, lineFront - 2) && (!passable(i - 1, lineFront - 1) || !passable(i - 1, lineFront - 2) || !passable(i + 1, lineFront - 1) || !passable(i + 1, lineFront - 2)))){
     							frontLineOpen = true;
         						frontLineMap[i][lineFront] = true;
     						}
     					}
     					else{
-    						if(r.getVisibleRobotMap()[i][backLineMap[0].length - lineFront - 1] == 0 && r.getPassableMap()[i][backLineMap[0].length - lineFront - 1]){
+    						if(r.getVisibleRobotMap()[i][backLineMap[0].length - lineFront - 1] == 0 && r.getPassableMap()[i][backLineMap[0].length - lineFront - 1] && !(passable(i, backLineMap[0].length - lineFront - 3) && (!passable(i - 1, backLineMap[0].length - lineFront - 2) || !passable(i - 1, backLineMap[0].length - lineFront - 3) || !passable(i + 1, backLineMap[0].length - lineFront - 2) || !passable(i + 1, backLineMap[0].length - lineFront - 3)))){
     							frontLineOpen = true;
         						frontLineMap[i][backLineMap[0].length - lineFront - 1] = true;
     						}
@@ -1433,13 +1561,13 @@ public class MyRobot extends BCAbstractRobot {
 				else{
 					for(int i = 0; i < backLineMap[0].length; i++){
 						if(topOrLeft){
-							if(r.getVisibleRobotMap()[lineFront][i] == 0 && r.getPassableMap()[lineFront][i]){
+							if(r.getVisibleRobotMap()[lineFront][i] == 0 && r.getPassableMap()[lineFront][i] && !(passable(lineFront - 2, i) && (!passable(lineFront - 1, i - 1) || !passable(lineFront - 2, i - 1) || !passable(lineFront - 1, i + 1) || !passable(lineFront - 2, i + 1)))){
     							frontLineOpen = true;
         						frontLineMap[lineFront][i] = true;
 							}
 						}
     					else{
-    						if(r.getVisibleRobotMap()[backLineMap[0].length - lineFront - 1][i] == 0 && r.getPassableMap()[backLineMap[0].length - lineFront - 1][i]){
+    						if(r.getVisibleRobotMap()[backLineMap[0].length - lineFront - 1][i] == 0 && r.getPassableMap()[backLineMap[0].length - lineFront - 1][i] && !(passable(backLineMap[0].length - lineFront - 3, i) && (!passable(backLineMap[0].length - lineFront - 2, i - 1) || !passable(backLineMap[0].length - lineFront - 3, i - 1) || !passable(backLineMap[0].length - lineFront - 2, i + 1) || !passable(backLineMap[0].length - lineFront - 3, i + 1)))){
     							frontLineOpen = true;
         						frontLineMap[backLineMap[0].length - lineFront - 1][i] = true;
     						}
@@ -1451,6 +1579,24 @@ public class MyRobot extends BCAbstractRobot {
 					target = path.pollLast();
 					path.add(target);
 				}
+				else{
+					if(verticallySymmetric){
+						for(int i = r.me.y - 8; i <= r.me.y + 8; i++){
+							if(passable(i, r.me.x) && r.getVisibleRobotMap()[i][r.me.x] == 0){
+								r.castleTalk(99);
+								break;
+							}
+						}
+					}
+					else{
+						for(int i = r.me.x - 8; i <= r.me.x + 8; i++){
+							if(passable(r.me.y, i) && r.getVisibleRobotMap()[r.me.y][i] == 0){
+								r.castleTalk(99);
+								break;
+							}
+						}
+					}
+				}
 			}
 			return followPath();
   
@@ -1460,11 +1606,16 @@ public class MyRobot extends BCAbstractRobot {
     	}
     	
     	public Action targetBlocked(){
-			path = search(backLineMap);
-			if(!path.isEmpty()){
-				target = path.pollLast();
-				path.add(target);
-			}
+    		if(phase == 2){
+				path = search(backLineMap);
+				if(!path.isEmpty()){
+					target = path.pollLast();
+					path.add(target);
+				}
+    		}
+    		else{
+    			return null;
+    		}
     		return followPath();
     	}
     }
